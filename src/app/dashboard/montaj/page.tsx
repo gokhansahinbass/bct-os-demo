@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { updateGuest } from "@/lib/store";
+import { updateGuest, type Guest } from "@/lib/store";
 
 export default function MontajPage() {
-  const { guests } = useStore();
+  const { guests, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
@@ -66,8 +67,9 @@ export default function MontajPage() {
     showToast(`Alt Bant (KJ) panoya kopyalandı.`);
   }
 
-  const VipBadge = ({ vip }: { vip: boolean }) =>
-    vip ? (
+  const VipBadge = ({ card }: { card: Guest }) => {
+    const isVip = Boolean(card.services && card.services.length > 0 && card.services.some((s) => s.price > 0));
+    return isVip ? (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-[#DCFCE7] text-[#166534] flex-shrink-0 font-medium border border-[#BBF7D0]">
         ⭐ VIP
       </span>
@@ -76,9 +78,41 @@ export default function MontajPage() {
         Ücretsiz
       </span>
     );
+  };
+
+  if (!canAccessPage("/dashboard/montaj")) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-xl mx-auto my-12 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl border border-amber-200 shadow-inner">
+          🔒
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Erişim Yetkiniz Bulunmuyor</h2>
+        <p className="text-xs text-slate-500">
+          Mevcut rolünüz ({activeRoleDef?.label || "Rolünüz"}) Kurgu &amp; Montaj modülünü görüntüleme yetkisine sahip değildir.
+        </p>
+        <Link href="/dashboard" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition">
+          Ana Sayfaya Dön
+        </Link>
+      </div>
+    );
+  }
+
+  const isMontajBlurred = isSensitiveBlurred("montaj");
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full relative">
+      {/* Rol Kısıtlaması Uyarısı / Blurlama */}
+      {isMontajBlurred && (
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+          <span className="flex items-center gap-2">
+            <span>🔒</span>
+            <strong>Rol Kısıtlaması:</strong> Kurgu istatistikleri ve montaj sayıları rolünüz için kısıtlanmıştır (view_montaj_stats kapalı).
+          </span>
+          <span className="text-[10px] font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+            view_montaj_stats: false
+          </span>
+        </div>
+      )}
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-white text-[#0F172A] rounded-xl border border-slate-200 shadow-xl text-sm font-medium animate-fadeIn">
@@ -102,7 +136,7 @@ export default function MontajPage() {
               Aktif Editör: Gökhan
             </span>
           </div>
-          <p className="text-sm text-slate-500">Stüdyo çekimi tamamlanan konukların kurgu, KJ aktarımı ve izleme teslim süreci.</p>
+          <p className="text-sm text-slate-500">Stüdyo çekimi tamamlanan konukların kurgu, revize takibi, KJ aktarımı ve izleme teslim süreci.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative flex items-center">
@@ -115,6 +149,12 @@ export default function MontajPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <Link
+            href="/dashboard/revize"
+            className="h-9 px-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition"
+          >
+            <span>⏱</span> Revize Masası
+          </Link>
           <div className="h-9 px-3 bg-white border border-slate-200 text-slate-500 rounded-lg text-xs inline-flex items-center gap-1.5 shadow-xs">
             <span className="material-symbols-outlined text-[17px] text-emerald-500">sync</span>
             <span className="font-mono text-xs text-slate-700 font-medium">Toplam {guests.length} Konuk</span>
@@ -141,46 +181,71 @@ export default function MontajPage() {
                 Kurgu bekleyen konuk yok
               </div>
             ) : (
-              bekleyen.map((card) => (
-                <article
-                  key={card.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-slate-300 hover:shadow transition-all duration-150 flex flex-col gap-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
-                      <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
+              bekleyen.map((card) => {
+                const unresNotes = card.notes?.filter(n => !n.resolved) || [];
+                return (
+                  <article
+                    key={card.id}
+                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-slate-300 hover:shadow transition-all duration-150 flex flex-col gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
+                        <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
+                      </div>
+                      <VipBadge card={card} />
                     </div>
-                    <VipBadge vip={card.vip} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">folder_open</span>
-                      {card.hdd || "HDD-01"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-slate-500 text-[11px]">
-                      <span className="material-symbols-outlined text-[14px]">schedule</span>
-                      {card.shootTime} ({card.shootDuration})
-                    </span>
-                  </div>
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <button
-                      className="h-8 px-2.5 rounded-md text-[11px] text-[#0F172A] hover:bg-slate-50 border border-slate-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      onClick={() => copyKJ(`${card.name} — ${card.company} — ${card.title}`)}
-                    >
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">content_copy</span>
-                      Alt Bandı Kopyala
-                    </button>
-                    <button
-                      className="h-8 px-3 rounded-lg text-[11px] font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
-                      onClick={() => claimTask(card.id)}
-                    >
-                      İşi Üzerime Al
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                    </button>
-                  </div>
-                </article>
-              ))
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
+                        <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
+                        {card.studio}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-slate-500 text-[11px]">
+                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                        {card.shootTime} ({card.shootDuration})
+                      </span>
+                    </div>
+
+                    {/* Revize Notları Preview if any */}
+                    {unresNotes.length > 0 && (
+                      <div className="bg-amber-50/80 border border-amber-200 rounded-lg p-2.5 text-xs flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between font-semibold text-amber-900">
+                          <span className="flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[15px] text-amber-700">rate_review</span>
+                            {unresNotes.length} Açık Revize Notu
+                          </span>
+                          <Link href="/dashboard/revize" className="text-[10px] text-blue-600 hover:underline">Revize Masası →</Link>
+                        </div>
+                        <div className="space-y-1">
+                          {unresNotes.slice(0, 2).map((n) => (
+                            <div key={n.id} className="text-[11px] text-slate-700 flex items-start gap-1">
+                              <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-100 px-1 rounded">{n.time}</span>
+                              <span className="truncate">{n.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <button
+                        className="h-8 px-2.5 rounded-md text-[11px] text-[#0F172A] hover:bg-slate-50 border border-slate-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                        onClick={() => copyKJ(`${card.name} — ${card.company} — ${card.title}`)}
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-slate-400">content_copy</span>
+                        Alt Bandı Kopyala
+                      </button>
+                      <button
+                        className="h-8 px-3 rounded-lg text-[11px] font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
+                        onClick={() => claimTask(card.id)}
+                      >
+                        İşi Üzerime Al
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
             )}
           </div>
         </div>
@@ -203,56 +268,82 @@ export default function MontajPage() {
                 Şu anda kurguda aktif iş yok
               </div>
             ) : (
-              kurguda.map((card) => (
-                <article
-                  key={card.id}
-                  className="bg-white rounded-xl border border-blue-200 ring-1 ring-blue-100 p-4 shadow-sm transition-all duration-150 flex flex-col gap-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
-                        <span className="inline-flex items-center w-2 h-2 rounded-full bg-emerald-500"></span>
+              kurguda.map((card) => {
+                const unresNotes = card.notes?.filter(n => !n.resolved) || [];
+                return (
+                  <article
+                    key={card.id}
+                    className="bg-white rounded-xl border border-blue-200 ring-1 ring-blue-100 p-4 shadow-sm transition-all duration-150 flex flex-col gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
+                          <span className="inline-flex items-center w-2 h-2 rounded-full bg-emerald-500"></span>
+                        </div>
+                        <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
                       </div>
-                      <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
+                      <VipBadge card={card} />
                     </div>
-                    <VipBadge vip={card.vip} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">folder_open</span>
-                      {card.hdd || "HDD-02"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[#2563EB] text-[11px] font-medium border border-blue-100">
-                      <span className="material-symbols-outlined text-[14px]">timer</span>
-                      {card.shootDuration || "25 dk"}
-                    </span>
-                  </div>
-                  <div className="bg-amber-50 text-amber-900 border border-amber-200/90 rounded-lg p-2.5 flex items-start gap-2.5">
-                    <span className="material-symbols-outlined text-amber-700 text-[18px] flex-shrink-0 mt-0.5">lock</span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-semibold text-amber-900">{card.editor || "Gökhan"} Kurguluyor</span>
-                      <span className="text-[11px] text-amber-700 leading-relaxed">Kurgu kilitli — diğer editörlerin işlemine kapalı</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
+                        <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
+                        {card.studio}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[#2563EB] text-[11px] font-medium border border-blue-100">
+                        <span className="material-symbols-outlined text-[14px]">timer</span>
+                        {card.shootDuration || "25 dk"}
+                      </span>
+                      <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                     </div>
-                  </div>
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <button
-                      className="h-9 px-3 rounded-lg text-[11px] text-[#0F172A] hover:bg-slate-50 border border-slate-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      onClick={() => copyKJ(`${card.name} — ${card.company} — ${card.title}`)}
-                    >
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">content_copy</span>
-                      Alt Bandı Kopyala
-                    </button>
-                    <button
-                      className="h-9 px-3.5 rounded-lg text-[11px] font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
-                      onClick={() => completeTask(card.id)}
-                    >
-                      Kurgu Bitti -&gt; İzlemeye Gönder
-                      <span className="material-symbols-outlined text-[16px]">check</span>
-                    </button>
-                  </div>
-                </article>
-              ))
+
+                    {/* Revize Notları Detail */}
+                    {unresNotes.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between font-bold text-amber-900">
+                          <span className="flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[15px] text-amber-700">report</span>
+                            {unresNotes.length} Düzeltilmesi Gereken Revize Var!
+                          </span>
+                          <Link href="/dashboard/revize" className="text-[10px] text-blue-600 hover:underline">Revize Masası →</Link>
+                        </div>
+                        <div className="space-y-1">
+                          {unresNotes.map((n) => (
+                            <div key={n.id} className="text-[11px] text-slate-800 bg-white/70 p-1 rounded border border-amber-100 flex items-start gap-1.5">
+                              <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200 shrink-0">⏱ {n.time}</span>
+                              <span className="font-medium text-slate-900">{n.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-amber-50 text-amber-900 border border-amber-200/90 rounded-lg p-2.5 flex items-start gap-2.5">
+                      <span className="material-symbols-outlined text-amber-700 text-[18px] flex-shrink-0 mt-0.5">lock</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-amber-900">{card.editor || "Gökhan"} Kurguluyor</span>
+                        <span className="text-[11px] text-amber-700 leading-relaxed">Kurgu kilitli — diğer editörlerin işlemine kapalı</span>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <button
+                        className="h-9 px-3 rounded-lg text-[11px] text-[#0F172A] hover:bg-slate-50 border border-slate-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                        onClick={() => copyKJ(`${card.name} — ${card.company} — ${card.title}`)}
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-slate-400">content_copy</span>
+                        Alt Bandı Kopyala
+                      </button>
+                      <button
+                        className="h-9 px-3.5 rounded-lg text-[11px] font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+                        onClick={() => completeTask(card.id)}
+                      >
+                        Kurgu Bitti -&gt; İzlemeye Gönder
+                        <span className="material-symbols-outlined text-[16px]">check</span>
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
             )}
           </div>
         </div>
@@ -285,17 +376,18 @@ export default function MontajPage() {
                       <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
                       <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
                     </div>
-                    <VipBadge vip={card.vip} />
+                    <VipBadge card={card} />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">folder_open</span>
-                      {card.hdd || "HDD-01"}
+                      <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
+                      {card.studio}
                     </span>
+                    <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                   </div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-[11px]">
                     <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-                    {card.status === "review_approved" ? "Onaylandı → Dijital Kartta" : "Revize Bekliyor / İzleme Masasında"}
+                    {card.status === "review_approved" ? "Onaylandı → Dijital Kartta" : "İzleme Masasında İnceleniyor"}
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-500 px-0.5">
                     <span className="inline-flex items-center gap-1">

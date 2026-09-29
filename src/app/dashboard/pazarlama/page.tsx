@@ -1,23 +1,113 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { updateGuest } from "@/lib/store";
+import {
+  updateGuest,
+  addServiceToGuest,
+  removeServiceFromGuest,
+  type ServiceType,
+  type ServiceDetail,
+  type Service,
+} from "@/lib/store";
+
+const SERVICE_TEMPLATES: {
+  type: ServiceType;
+  label: string;
+  icon: string;
+  color: string;
+  detailOptions: string[];
+}[] = [
+  {
+    type: "dergi",
+    label: "Basılı Dergi",
+    icon: "menu_book",
+    color: "blue",
+    detailOptions: [
+      "Ön Kapak",
+      "Arka Kapak",
+      "İç Kapak",
+      "1 Sayfa Röportaj",
+      "2 Sayfa Röportaj",
+      "4 Sayfa Röportaj",
+      "6 Sayfa Röportaj",
+      "Özel Dosya Eki",
+    ],
+  },
+  {
+    type: "haber_sitesi",
+    label: "Haber Sitesi Yayını",
+    icon: "newspaper",
+    color: "emerald",
+    detailOptions: [
+      "Ulusal Basın Dağıtım",
+      "Google News İndeksleme",
+      "Ekonomi & İş Dünyası Portalları",
+      "Bölgesel Basın Ağı",
+    ],
+  },
+  {
+    type: "sosyal_medya",
+    label: "Sosyal Medya",
+    icon: "share",
+    color: "violet",
+    detailOptions: [
+      "Instagram Reels",
+      "YouTube Shorts",
+      "TikTok Videosu",
+      "LinkedIn Kesit & Post",
+      "Fotoğraf & Grafik Tasarım",
+    ],
+  },
+  {
+    type: "video",
+    label: "Video & Arşiv",
+    icon: "videocam",
+    color: "amber",
+    detailOptions: [
+      "VIP Kalıcı Video",
+      "4K YouTube Master Arşiv",
+      "Sosyal Medya Yayın Hakları",
+      "Kısa Tanıtım Teaser'ı",
+    ],
+  },
+  {
+    type: "ek_hizmet",
+    label: "Özel Ek Hizmet",
+    icon: "add_circle",
+    color: "slate",
+    detailOptions: [],
+  },
+];
+
+const COLOR_MAP: Record<string, { bg: string; border: string; text: string; badgeBg: string }> = {
+  blue: { bg: "bg-blue-50/40", border: "border-blue-200", text: "text-blue-700", badgeBg: "bg-blue-100" },
+  emerald: { bg: "bg-emerald-50/40", border: "border-emerald-200", text: "text-emerald-700", badgeBg: "bg-emerald-100" },
+  violet: { bg: "bg-violet-50/40", border: "border-violet-200", text: "text-violet-700", badgeBg: "bg-violet-100" },
+  amber: { bg: "bg-amber-50/40", border: "border-amber-200", text: "text-amber-700", badgeBg: "bg-amber-100" },
+  slate: { bg: "bg-slate-50/40", border: "border-slate-200", text: "text-slate-700", badgeBg: "bg-slate-100" },
+};
 
 export default function PazarlamaPage() {
-  const { guests } = useStore();
+  const { guests, canAccessPage, isSensitiveBlurred, activeRoleDef, hasPermission } = useStore();
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  // Form states
-  const [videoPackage, setVideoPackage] = useState<"vip" | "free">("vip");
-  const [magazinePackage, setMagazinePackage] = useState("2 Sayfa Röportaj + Ön Kapak (Business Leaders Magazine)");
-  const [pressDistribution, setPressDistribution] = useState(true);
-  const [amount, setAmount] = useState("60.000");
-  const [paymentStatus, setPaymentStatus] = useState("Kapora Alındı (20.000 TL)");
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Candidates for packaging: shoot_done, kiosk_registered, or package_set, or all non-archived
+  // Hizmet Ekleme Modal Durumu
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [newServiceType, setNewServiceType] = useState<ServiceType>("dergi");
+  const [newServiceDetails, setNewServiceDetails] = useState<ServiceDetail[]>([]);
+  const [newServiceQuantity, setNewServiceQuantity] = useState(1);
+  const [newServicePrice, setNewServicePrice] = useState(15000);
+  const [newServiceNote, setNewServiceNote] = useState("");
+  const [customPageCount, setCustomPageCount] = useState("");
+
+  // Finans Durumu
+  const [paymentStatus, setPaymentStatus] = useState<"odenmedi" | "on_odeme" | "tamamlandi" | "ucretsiz">("odenmedi");
+  const [onOdemeMiktari, setOnOdemeMiktari] = useState<number>(0);
+
   const filteredGuests = useMemo(() => {
     return guests.filter((g) => {
       const q = search.toLowerCase();
@@ -26,7 +116,6 @@ export default function PazarlamaPage() {
     });
   }, [guests, search]);
 
-  // Selected guest or default to first guest
   const activeGuest = useMemo(() => {
     if (selectedId) {
       const found = guests.find((g) => g.id === selectedId);
@@ -39,81 +128,148 @@ export default function PazarlamaPage() {
     setSelectedId(id);
     const g = guests.find((item) => item.id === id);
     if (g) {
-      setVideoPackage(g.vip || g.videoPackage.includes("VIP") ? "vip" : "free");
-      setMagazinePackage(g.magazinePackage || "1 Sayfa Röportaj (Standart)");
-      setPressDistribution(g.pressDistribution ?? true);
-      setAmount(g.amount && g.amount !== "0" ? g.amount : "50.000");
-      setPaymentStatus(g.paymentStatus || "Kapora Alındı (20.000 TL)");
+      setPaymentStatus(g.paymentStatus || "odenmedi");
+      setOnOdemeMiktari(g.onOdemeMiktari || 0);
     }
+  }
+
+  function openServiceModal() {
+    setNewServiceType("dergi");
+    const tmpl = SERVICE_TEMPLATES.find((t) => t.type === "dergi");
+    setNewServiceDetails(tmpl?.detailOptions.map((d) => ({ label: d, checked: false })) || []);
+    setNewServiceQuantity(1);
+    setNewServicePrice(15000);
+    setNewServiceNote("");
+    setCustomPageCount("");
+    setShowServiceModal(true);
+  }
+
+  function handleAddService() {
+    if (!activeGuest) return;
+
+    let finalDetails = newServiceDetails.filter((d) => d.checked);
+
+    // Dergi için özel sayfa sayısı girildiyse
+    if (newServiceType === "dergi" && customPageCount.trim()) {
+      finalDetails.push({ label: `${customPageCount.trim()} Sayfa Röportaj`, checked: true });
+    }
+
+    // Ek hizmet serbest metin
+    if (newServiceType === "ek_hizmet" && newServiceNote.trim()) {
+      finalDetails = [{ label: newServiceNote.trim(), checked: true }];
+    }
+
+    addServiceToGuest(activeGuest.id, {
+      type: newServiceType,
+      details: finalDetails,
+      quantity: newServiceQuantity,
+      price: newServicePrice,
+      customNote: newServiceNote || undefined,
+    });
+
+    setShowServiceModal(false);
+    setFeedback(`✓ ${activeGuest.name} için yeni hizmet eklendi.`);
+    setTimeout(() => setFeedback(null), 3000);
+  }
+
+  function handleRemoveService(serviceId: string) {
+    if (!activeGuest) return;
+    removeServiceFromGuest(activeGuest.id, serviceId);
   }
 
   function handleSaveAndSendToEdit() {
     if (!activeGuest) return;
 
+    const totalPrice = activeGuest.services.reduce((sum, s) => sum + s.price, 0);
+
     updateGuest(activeGuest.id, {
-      videoPackage: videoPackage === "vip" ? "VIP Kalıcı Video & Sosyal Medya Yayını" : "Ücretsiz Tek Seferlik Canlı Yayın",
-      magazinePackage,
-      pressDistribution,
-      amount,
+      amount: totalPrice.toLocaleString("tr-TR"),
       paymentStatus,
-      vip: videoPackage === "vip",
+      onOdemeMiktari: paymentStatus === "on_odeme" ? onOdemeMiktari : 0,
+      vip: totalPrice > 0,
       status: "package_set",
     });
 
-    setFeedback(`✓ ${activeGuest.name} paketi tanımlandı ve Montaj Panosu'ndaki 'Kurgu Bekleyen' kuyruğuna aktarıldı!`);
+    setFeedback(`✓ ${activeGuest.name} paketi ve ödeme bilgisi kaydedildi, montaj kuyruğuna aktarıldı!`);
     setTimeout(() => setFeedback(null), 4000);
   }
 
+  function getServiceTemplate(type: ServiceType) {
+    return SERVICE_TEMPLATES.find((t) => t.type === type) || SERVICE_TEMPLATES[0];
+  }
+
+  const selectedTemplate = getServiceTemplate(newServiceType);
+  const totalBill = activeGuest ? activeGuest.services.reduce((sum, s) => sum + s.price, 0) : 0;
+  const remainingBill = Math.max(0, totalBill - (paymentStatus === "on_odeme" ? onOdemeMiktari : paymentStatus === "tamamlandi" ? totalBill : 0));
+
+  if (!canAccessPage("/dashboard/pazarlama")) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-xl mx-auto my-12 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl border border-amber-200 shadow-inner">
+          🔒
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Erişim Yetkiniz Bulunmuyor</h2>
+        <p className="text-xs text-slate-500">
+          Mevcut rolünüz ({activeRoleDef?.label || "Rolünüz"}) Pazarlama Masası modülünü görüntüleme yetkisine sahip değildir.
+        </p>
+        <Link href="/dashboard" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition">
+          Ana Sayfaya Dön
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col w-full h-full max-w-[1560px] mx-auto">
+    <div className="flex flex-col w-full h-full max-w-[1560px] mx-auto pb-12">
       {/* Top Context Ribbon */}
-      <div className="flex items-center justify-between pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-3 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#2563EB]"></span>
-            <h1 className="text-xl font-semibold text-[#0F172A]">Pazarlama Masası</h1>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]"></span>
+            <h1 className="text-xl font-bold text-[#0F172A]">Pazarlama Masası</h1>
           </div>
           <span className="text-slate-400 text-sm">/</span>
-          <p className="text-sm text-slate-600">Bugün tamamlanan stüdyo çekimleri ve satış paketleme</p>
+          <p className="text-sm text-slate-600">Esnek hizmet tanımlama, ön ödeme ve satış sözleşmesi</p>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-600">Aktif Konuk Havuzu:</span>
-          <span className="text-xs font-mono text-[#0F172A] bg-slate-100 px-2 py-0.5 rounded font-semibold">
-            {guests.length} Konuk
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/odalar"
+            className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition flex items-center gap-1.5"
+          >
+            <span>📊</span> Pazarlamacı Başarı &amp; Satış Tablosu →
+          </Link>
+          <span className="text-xs text-slate-500 font-medium bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+            ★ Canlı Yayın Tüm Konuklar İçin Ücretsizdir
           </span>
         </div>
       </div>
 
       {feedback && (
-        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm flex items-center justify-between shadow-xs">
-          <span className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-600 text-lg">check_circle</span>
-            {feedback}
-          </span>
-          <button onClick={() => setFeedback(null)} className="text-emerald-700 hover:text-emerald-950 font-semibold text-xs">
-            Kapat
-          </button>
+        <div className="mt-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center justify-between animate-fade-in">
+          <span>{feedback}</span>
+          <button onClick={() => setFeedback(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* Main Split */}
-      <div className="grid grid-cols-12 gap-6 flex-1 min-h-0 items-start">
-        {/* LEFT: Bugün Çekimi Bitenler */}
-        <section className="col-span-12 lg:col-span-4 flex flex-col h-[calc(100vh-160px)] bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
-          <div className="p-4 bg-slate-50/50">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-[#0F172A]">Konuk Listesi</h2>
-                <span className="px-2 py-0.5 rounded-full text-[11px] bg-blue-50 text-[#2563EB] font-semibold">
-                  {filteredGuests.length} Kişi
-                </span>
-              </div>
+      {/* Main Grid: Left List (35%), Right Workstation (65%) */}
+      <div className="grid grid-cols-12 gap-6 mt-6 items-start">
+        {/* LEFT: Guest Queue */}
+        <section className="col-span-12 lg:col-span-4 bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Konuk Sırası ({filteredGuests.length})
+              </span>
+              <span className="text-xs text-blue-600 font-medium">Tüm Odalar</span>
             </div>
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-base pointer-events-none">search</span>
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                search
+              </span>
               <input
-                className="w-full h-8 pl-8 pr-3 bg-white rounded-lg text-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#2563EB] shadow-xs border border-slate-200 transition-all"
-                placeholder="Misafir veya firma ara..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB]"
+                placeholder="Konuk veya firma ara..."
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -121,251 +277,496 @@ export default function PazarlamaPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+          <div className="divide-y divide-slate-100 max-h-[640px] overflow-y-auto">
             {filteredGuests.map((g) => {
               const isSelected = activeGuest?.id === g.id;
-              const isPackaged = ["package_set", "editing", "edit_done", "reviewing", "review_approved", "publishing"].includes(g.status);
+              const serviceCount = g.services.length;
 
               return (
                 <article
                   key={g.id}
                   onClick={() => handleSelectGuest(g.id)}
-                  className={`relative p-3.5 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow group border ${
+                  className={`p-3.5 cursor-pointer transition-all ${
                     isSelected
-                      ? "bg-blue-50/40 border-[#2563EB] ring-1 ring-[#2563EB]"
-                      : "bg-white border-slate-200 hover:bg-slate-50"
+                      ? "bg-blue-50/70 border-l-4 border-l-[#2563EB]"
+                      : "hover:bg-slate-50"
                   }`}
                 >
-                  {isSelected && (
-                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#2563EB] rounded-r-full"></div>
-                  )}
-                  <div className={isSelected ? "pl-2" : ""}>
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors">
-                          {g.name}
-                        </h3>
-                        {g.vip && (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-[#0F172A] truncate">{g.name}</span>
+                        {Boolean(g.services && g.services.length > 0 && g.services.some(s => s.price > 0)) && (
+                          <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">
                             VIP
                           </span>
                         )}
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono shrink-0">
-                        <span className="material-symbols-outlined text-[12px]">schedule</span>
-                        {g.shootTime}
-                      </span>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {g.company} • {g.title}
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-500 truncate mb-2.5">
-                      {g.company} • {g.shootDuration}
-                    </p>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
-                        {g.studio}
-                      </span>
-                      {isPackaged ? (
-                        <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-0.5">
-                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                          Paket Hazır
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[#2563EB] font-semibold flex items-center gap-0.5">
-                          Paket Düzenle
-                          <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                        </span>
-                      )}
+                    <span className="font-mono text-[11px] font-bold text-[#0F172A]">
+                      ₺{((g.services || []).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString("tr-TR")}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <span>{g.shootTime}</span>
+                      <span>•</span>
+                      <span className="text-blue-600 font-medium">{serviceCount} Hizmet</span>
                     </div>
+
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                      g.paymentStatus === "tamamlandi"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : g.paymentStatus === "on_odeme"
+                        ? "bg-blue-100 text-blue-800"
+                        : g.paymentStatus === "ucretsiz"
+                        ? "bg-slate-100 text-slate-600"
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {g.paymentStatus === "tamamlandi"
+                        ? "Tahsil Edildi"
+                        : g.paymentStatus === "on_odeme"
+                        ? `Ön Ödeme (₺${(g.onOdemeMiktari || 0).toLocaleString("tr-TR")})`
+                        : g.paymentStatus === "ucretsiz"
+                        ? "Ücretsiz"
+                        : "Ödeme Bekliyor"}
+                    </span>
                   </div>
                 </article>
               );
             })}
           </div>
-
-          <div className="p-3 bg-slate-50/70 flex items-center justify-between text-slate-500 text-[11px] border-t border-slate-200">
-            <span>Toplam {filteredGuests.length} misafir kaydı listelendi</span>
-            <span className="font-mono">BCT-MKT-V2</span>
-          </div>
         </section>
 
-        {/* RIGHT: Paket Tanımlama Masası */}
+        {/* RIGHT: Hizmet Tanımlama Masası */}
         {activeGuest ? (
-          <main className="col-span-12 lg:col-span-8 bg-white rounded-xl shadow-sm p-7 flex flex-col justify-between border border-slate-200">
-            <header className="pb-5">
+          <main className="col-span-12 lg:col-span-8 bg-white rounded-xl shadow-xs p-6 flex flex-col border border-slate-200 gap-6">
+            <header className="pb-4 border-b border-slate-200">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-[#0F172A] tracking-tight">{activeGuest.name}</h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-900 font-semibold tracking-wide uppercase">
-                      {activeGuest.status === "package_set" ? "Kurguya Gönderildi" : "Paket Düzenleniyor"}
+                    <h2 className="text-2xl font-bold text-[#0F172A]">{activeGuest.name}</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      {activeGuest.room === "oda-1" ? "Oda 1 (Ayşe Yılmaz)" : activeGuest.room === "oda-2" ? "Oda 2 (Caner Kaya)" : "Oda 3"}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    {activeGuest.company} — {activeGuest.title}
+                  <p className="text-sm text-slate-500 mt-1">
+                    {activeGuest.company} — {activeGuest.title} • Çekim: {activeGuest.shootTime} • Kayıt No: <strong className="font-mono text-slate-800">{activeGuest.registrationNo}</strong>
                   </p>
                 </div>
+
                 <div className="flex items-center gap-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-50 text-xs text-slate-500 font-mono">
-                    <span className="material-symbols-outlined text-[14px] text-slate-400">schedule</span>
-                    Çekim Saati: {activeGuest.shootTime}
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-50 text-xs text-slate-500 font-mono">
-                    <span className="material-symbols-outlined text-[14px] text-slate-400">tag</span>
-                    Kayıt No: {activeGuest.registrationNo}
-                  </div>
+                  <button
+                    onClick={openServiceModal}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2563EB] text-white text-xs font-semibold hover:bg-blue-700 transition shadow-xs cursor-pointer"
+                  >
+                    <span className="text-sm font-bold">+</span> Hizmet Ekle
+                  </button>
                 </div>
               </div>
             </header>
 
-            <div className="space-y-6 pt-5">
-              {/* Video Paketi */}
-              <fieldset className="space-y-2.5">
-                <legend className="block">
-                  <span className="text-base font-semibold text-[#0F172A]">Video Paketi</span>
-                  <span className="text-sm text-slate-500 block mt-0.5">Stüdyo kaydının yayınlanma ve arşivlenme formatı</span>
-                </legend>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
-                  <label
-                    onClick={() => setVideoPackage("vip")}
-                    className={`relative flex items-start gap-3.5 p-4 rounded-lg cursor-pointer transition-all shadow-xs border ${
-                      videoPackage === "vip"
-                        ? "bg-blue-50/30 ring-2 ring-[#2563EB] border-blue-200"
-                        : "bg-white hover:bg-slate-50/50 border-slate-200"
-                    }`}
+            {/* Tanımlı Hizmetler Listesi */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[#0F172A] uppercase tracking-wider">
+                  Tanımlanan Hizmetler ({activeGuest.services.length})
+                </h3>
+                <span className="text-xs text-slate-500 font-mono">
+                  Toplam Satış: <strong className="text-base text-slate-900 font-bold">₺{totalBill.toLocaleString("tr-TR")}</strong>
+                </span>
+              </div>
+
+              {activeGuest.services.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                  <p className="text-xs text-slate-400 font-medium">Bu konuk için henüz hizmet tanımlanmadı. Sabit paket yok, "Hizmet Ekle" ile dilediğiniz dergi, haber sitesi veya ek hizmeti ekleyin.</p>
+                  <button
+                    onClick={openServiceModal}
+                    className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
                   >
-                    <input
-                      checked={videoPackage === "vip"}
-                      onChange={() => setVideoPackage("vip")}
-                      className="mt-0.5 text-[#2563EB] focus:ring-0 w-4 h-4 cursor-pointer"
-                      name="video_package"
-                      type="radio"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-sm font-semibold text-[#0F172A]">VIP Kalıcı Video &amp; Sosyal Medya Yayını</span>
-                        <span className="material-symbols-outlined text-[#2563EB] text-base">verified</span>
+                    + Şimdi Hizmet Ekle
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {activeGuest.services.map((svc) => {
+                    const template = getServiceTemplate(svc.type);
+                    const colors = COLOR_MAP[template.color] || COLOR_MAP.slate;
+
+                    return (
+                      <div
+                        key={svc.id}
+                        className={`p-4 rounded-xl border ${colors.border} ${colors.bg} flex items-start justify-between gap-3 transition-all hover:shadow-xs`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-lg ${colors.badgeBg} ${colors.text} flex items-center justify-center shrink-0`}>
+                            <span className="material-symbols-outlined text-lg">{template.icon}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-[#0F172A]">{template.label}</span>
+                              {svc.quantity && svc.quantity > 1 && (
+                                <span className={`text-[11px] px-2 py-0.5 rounded ${colors.badgeBg} ${colors.text} font-bold`}>
+                                  ×{svc.quantity} Adet
+                                </span>
+                              )}
+                              <span className="text-sm font-bold text-slate-900 font-mono ml-auto">
+                                {svc.price > 0 ? `₺${svc.price.toLocaleString("tr-TR")}` : "Ücretsiz"}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {svc.details.filter((d) => d.checked).map((d, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-medium">
+                                  <span className="text-emerald-500 font-bold">✓</span>
+                                  {d.label}
+                                </span>
+                              ))}
+                              {svc.customNote && (
+                                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 italic">
+                                  {svc.customNote}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRemoveService(svc.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50 transition cursor-pointer shrink-0"
+                          title="Hizmeti Kaldır"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <p className="text-sm text-slate-500 mt-1">YouTube 4K kalıcı arşiv, Reels/Shorts kurguları, LinkedIn kesitleri dahil.</p>
-                    </div>
-                  </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-                  <label
-                    onClick={() => setVideoPackage("free")}
-                    className={`relative flex items-start gap-3.5 p-4 rounded-lg cursor-pointer transition-all shadow-xs border ${
-                      videoPackage === "free"
-                        ? "bg-blue-50/30 ring-2 ring-[#2563EB] border-blue-200"
-                        : "bg-white hover:bg-slate-50/50 border-slate-200"
-                    }`}
+            {/* Finans & Tahsilat (Requirement #4: No rigid kapora, flexible Ön Ödeme) */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Ödeme & Tahsilat Yönetimi
+                  </h4>
+                  <p className="text-xs text-slate-500">Müşterinin ödeme modelini ve varsa ön ödeme tutarını belirleyin</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] text-slate-500 block">Toplam Tutar</span>
+                  <span className="text-lg font-bold text-slate-900 font-mono">₺{totalBill.toLocaleString("tr-TR")}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Tahsilat Durumu
+                  </label>
+                  <select
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value as any)}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800 focus:outline-none focus:border-blue-500"
                   >
-                    <input
-                      checked={videoPackage === "free"}
-                      onChange={() => setVideoPackage("free")}
-                      className="mt-0.5 text-slate-400 focus:ring-0 w-4 h-4 cursor-pointer"
-                      name="video_package"
-                      type="radio"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-[#0F172A]">Ücretsiz Tek Seferlik Canlı Yayın</span>
-                      <p className="text-sm text-slate-500 mt-1">Sadece canlı yayın akışı, kurgusuz ham kayıt teslimi.</p>
-                    </div>
-                  </label>
+                    <option value="odenmedi">Ödeme Alınmadı / Beklemede</option>
+                    <option value="on_odeme">Ön Ödeme Yapıldı</option>
+                    <option value="tamamlandi">Tamamı Tahsil Edildi</option>
+                    <option value="ucretsiz">Ücretsiz / Sponsorluk</option>
+                  </select>
                 </div>
-              </fieldset>
 
-              {/* Basılı Dergi */}
-              <div className="space-y-1.5">
-                <label className="block text-base font-semibold text-[#0F172A]">Basılı Dergi Paketi</label>
-                <select
-                  value={magazinePackage}
-                  onChange={(e) => setMagazinePackage(e.target.value)}
-                  className="w-full h-11 px-3.5 bg-white rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 transition-colors border border-slate-200 text-sm"
-                >
-                  <option value="2 Sayfa Röportaj + Ön Kapak (Business Leaders Magazine)">2 Sayfa Röportaj + Ön Kapak (Business Leaders Magazine)</option>
-                  <option value="1 Sayfa Röportaj (Standart)">1 Sayfa Röportaj (Standart)</option>
-                  <option value="Basılı Dergi İstemiyor">Basılı Dergi İstemiyor</option>
-                </select>
-              </div>
-
-              {/* Dijital Haber Dağıtımı */}
-              <div className="space-y-1.5">
-                <span className="block text-base font-semibold text-[#0F172A]">Basın ve Dijital Dağıtım</span>
-                <label className="flex items-start gap-3.5 p-3.5 rounded-lg bg-white hover:bg-slate-50/60 cursor-pointer transition-all shadow-xs border border-slate-200">
-                  <div className="pt-0.5">
-                    <input
-                      checked={pressDistribution}
-                      onChange={(e) => setPressDistribution(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#2563EB] focus:ring-0 cursor-pointer"
-                      type="checkbox"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[#0F172A]">15 Ulusal Basın Sitesinde Haber Dağıtımı</span>
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-semibold">Google News İndeks</span>
-                    </div>
-                    <p className="text-sm text-slate-500 mt-0.5">Hürriyet, Milliyet, HaberTürk vb. sitelerde basın bülteni yayını ve Google News indeksleme.</p>
-                  </div>
-                </label>
-              </div>
-
-              {/* Finans & Tahsilat */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-semibold text-[#0F172A]">
-                    Finans &amp; Tahsilat <span className="text-sm text-slate-500 font-normal">(Muhasebe Onayı İçin)</span>
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Ön Ödeme Miktarı Input (Only visible when 'on_odeme' is selected) */}
+                {paymentStatus === "on_odeme" ? (
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">Anlaşılan Tutar (TL)</label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-sm text-slate-400">₺</span>
+                    <label className="block text-xs font-semibold text-blue-700 mb-1.5">
+                      Alınan Ön Ödeme Tutarı (₺)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">₺</span>
                       <input
-                        className="w-full h-10 pl-7 pr-3 bg-white rounded-lg text-base font-semibold text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#2563EB] shadow-xs border border-slate-200"
-                        type="text"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        type="number"
+                        min={0}
+                        step={500}
+                        placeholder="Örn: 20000"
+                        value={onOdemeMiktari || ""}
+                        onChange={(e) => setOnOdemeMiktari(parseInt(e.target.value) || 0)}
+                        className="w-full pl-8 pr-3 py-2 text-xs bg-white border-2 border-blue-400 rounded-lg font-bold font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Kalan Bakiye: <strong className="text-amber-700 font-mono">₺{remainingBill.toLocaleString("tr-TR")}</strong>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-xs text-slate-500 pt-5">
+                    {paymentStatus === "tamamlandi" && <span className="text-emerald-600 font-semibold">✓ Tutarın tamamı tahsil edilmiştir.</span>}
+                    {paymentStatus === "ucretsiz" && <span className="text-slate-500">Konuk çekim ve yayını ücretsiz olarak tanımlanmıştır.</span>}
+                    {paymentStatus === "odenmedi" && <span className="text-amber-700 font-semibold">⚠️ Henüz herhangi bir ödeme alınmamıştır.</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-2">
+              <button
+                onClick={handleSaveAndSendToEdit}
+                className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+              >
+                <span>Hizmet Paketini Kaydet ve Kurguya Sevk Et</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+            </div>
+          </main>
+        ) : (
+          <div className="col-span-12 lg:col-span-8 bg-white rounded-xl shadow-xs p-12 text-center text-slate-400 border border-slate-200">
+            Lütfen sol listeden bir misafir seçiniz.
+          </div>
+        )}
+      </div>
+
+      {/* Serbest Hizmet Ekleme Modalı */}
+      {showServiceModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowServiceModal(false); }}
+        >
+          <div className="max-w-lg w-full bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base text-[#0F172A]">Hizmet Tanımla</h3>
+                <p className="text-xs text-slate-500">{activeGuest?.name} için esnek hizmet ve fiyat</p>
+              </div>
+              <button
+                onClick={() => setShowServiceModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Hizmet Tipi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Hizmet Türü</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {SERVICE_TEMPLATES.map((tmpl) => {
+                    const colors = COLOR_MAP[tmpl.color] || COLOR_MAP.slate;
+                    const isSelected = newServiceType === tmpl.type;
+
+                    return (
+                      <button
+                        key={tmpl.type}
+                        type="button"
+                        onClick={() => {
+                          setNewServiceType(tmpl.type);
+                          setNewServiceDetails(tmpl.detailOptions.map((d) => ({ label: d, checked: false })));
+                          setNewServiceNote("");
+                          setCustomPageCount("");
+                          if (tmpl.type === "dergi") setNewServicePrice(15000);
+                          else if (tmpl.type === "haber_sitesi") setNewServicePrice(10000);
+                          else if (tmpl.type === "sosyal_medya") setNewServicePrice(10000);
+                          else if (tmpl.type === "video") setNewServicePrice(25000);
+                          else setNewServicePrice(5000);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                          isSelected
+                            ? `${colors.bg} ${colors.border} ring-2 ring-blue-500 font-bold`
+                            : "bg-white border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold text-slate-800">{tmpl.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Dergiye Özel Sayfa Sayısı & Seçenekler */}
+              {newServiceType === "dergi" && (
+                <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-xl space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-blue-900 mb-1">Kapak & Sayfa Seçenekleri</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {newServiceDetails.map((detail, idx) => (
+                        <label key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-blue-400 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={detail.checked}
+                            onChange={() => {
+                              setNewServiceDetails((prev) =>
+                                prev.map((d, i) => (i === idx ? { ...d, checked: !d.checked } : d))
+                              );
+                            }}
+                            className="rounded text-blue-600 cursor-pointer"
+                          />
+                          <span className="text-slate-800 font-medium">{detail.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-blue-900 mb-1">
+                      Özel Sayfa Sayısı (Örn: 3 sayfa, 8 sayfa vb.)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Örn: 8"
+                      value={customPageCount}
+                      onChange={(e) => setCustomPageCount(e.target.value)}
+                      className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Haber Sitesi Detayları */}
+              {newServiceType === "haber_sitesi" && (
+                <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-900 mb-1.5">
+                      Kaç Adet Haber Sitesi Yayınlanacak?
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[5, 10, 15, 25, 50].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => {
+                            setNewServiceQuantity(count);
+                            setNewServicePrice(count * 800);
+                          }}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
+                            newServiceQuantity === count
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {count} Site
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-slate-600">Özel Adet:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={newServiceQuantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1;
+                          setNewServiceQuantity(val);
+                          setNewServicePrice(val * 800);
+                        }}
+                        className="w-24 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-900 font-bold"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-slate-600 mb-1">Tahsilat Durumu</label>
-                    <select
-                      value={paymentStatus}
-                      onChange={(e) => setPaymentStatus(e.target.value)}
-                      className="w-full h-10 px-3 bg-white rounded-lg text-sm font-medium text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#2563EB] shadow-xs appearance-none cursor-pointer border border-slate-200"
-                    >
-                      <option value="Kapora Alındı (20.000 TL)">Kapora Alındı (20.000 TL)</option>
-                      <option value="Tamamı Tahsil Edildi">Tamamı Tahsil Edildi</option>
-                      <option value="Fatura Bekliyor">Fatura Bekliyor</option>
-                      <option value="Tahsilat Yapılmadı">Tahsilat Yapılmadı</option>
-                      <option value="Ücretsiz Çekim">Ücretsiz Çekim</option>
-                    </select>
+
+                  <div className="space-y-1.5 pt-1">
+                    {newServiceDetails.map((detail, idx) => (
+                      <label key={idx} className="flex items-center gap-2 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={detail.checked}
+                          onChange={() => {
+                            setNewServiceDetails((prev) =>
+                              prev.map((d, i) => (i === idx ? { ...d, checked: !d.checked } : d))
+                            );
+                          }}
+                          className="rounded text-emerald-600 cursor-pointer"
+                        />
+                        <span className="text-slate-800">{detail.label}</span>
+                      </label>
+                    ))}
                   </div>
+                </div>
+              )}
+
+              {/* Sosyal Medya & Video Detayları */}
+              {(newServiceType === "sosyal_medya" || newServiceType === "video") && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700">İçerik Seçimi</label>
+                  <div className="space-y-1.5">
+                    {newServiceDetails.map((detail, idx) => (
+                      <label key={idx} className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs">
+                        <input
+                          type="checkbox"
+                          checked={detail.checked}
+                          onChange={() => {
+                            setNewServiceDetails((prev) =>
+                              prev.map((d, i) => (i === idx ? { ...d, checked: !d.checked } : d))
+                            );
+                          }}
+                          className="rounded text-blue-600 cursor-pointer"
+                        />
+                        <span className="text-slate-800 font-medium">{detail.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ek Hizmet Metni */}
+              {newServiceType === "ek_hizmet" && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Hizmet Tanımı</label>
+                  <input
+                    type="text"
+                    placeholder="Örn: Özel Drone Çekimi veya VIP Karşılama Paketi"
+                    value={newServiceNote}
+                    onChange={(e) => setNewServiceNote(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+
+              {/* Fiyat Girişi (Serbestçe yazılabilir) */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Anlaşılan Hizmet Fiyatı (TL)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">₺</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={newServicePrice}
+                    onChange={(e) => setNewServicePrice(parseInt(e.target.value) || 0)}
+                    className="w-full pl-8 pr-3 py-2 text-sm font-bold font-mono text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  />
                 </div>
               </div>
             </div>
 
-            <footer className="pt-6 mt-6">
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
               <button
-                onClick={handleSaveAndSendToEdit}
-                className="w-full h-12 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all group cursor-pointer"
                 type="button"
+                onClick={() => setShowServiceModal(false)}
+                className="px-3.5 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer transition"
               >
-                <span>SATIŞI KAYDET VE KURGUYA GÖNDER</span>
-                <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                Vazgeç
               </button>
-              <p className="text-center text-sm text-slate-500 mt-2 flex items-center justify-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px] text-slate-400">info</span>
-                Onaylandığında kurgu masasına bildirim düşecek ve ham görüntüler montaja aktarılacaktır.
-              </p>
-            </footer>
-          </main>
-        ) : (
-          <div className="col-span-12 lg:col-span-8 bg-white rounded-xl shadow-sm p-12 text-center text-slate-400 border border-slate-200">
-            Lütfen sol listeden paket tanımlanacak bir misafir seçiniz.
+              <button
+                type="button"
+                onClick={handleAddService}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition"
+              >
+                Hizmeti Ekle
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

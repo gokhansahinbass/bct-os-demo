@@ -1,85 +1,285 @@
 "use client";
 
-import { useStore } from "@/lib/useStore";
-import { resetToDefaults } from "@/lib/store";
 import { useState } from "react";
+import { useStore } from "@/lib/useStore";
+import { markNotificationRead, markAllNotificationsRead, deleteNotification } from "@/lib/store";
+import Link from "next/link";
 
 export default function Header() {
-  const { guests } = useStore();
-  const [resetConfirm, setResetConfirm] = useState(false);
+  const {
+    notifications,
+    unreadCount,
+    roles,
+    activeRole,
+    activeRoleDef,
+    setActiveRole,
+    currentUser,
+    setCurrentUser,
+    staff,
+  } = useStore();
+  const [showNotifs, setShowNotifs] = useState(false);
 
-  const inStudioCount = guests.filter((g) =>
-    ["in_studio", "appointment_set", "kiosk_registered"].includes(g.status)
-  ).length;
-
-  const inEditingCount = guests.filter((g) =>
-    ["editing", "package_set"].includes(g.status)
-  ).length;
-
-  const inReviewCount = guests.filter((g) =>
-    ["reviewing", "edit_done", "review_approved"].includes(g.status)
-  ).length;
-
-  function handleReset() {
-    if (resetConfirm) {
-      resetToDefaults();
-      setResetConfirm(false);
-    } else {
-      setResetConfirm(true);
-      setTimeout(() => setResetConfirm(false), 3000);
+  function handleRoleChange(newRole: string) {
+    setActiveRole(newRole);
+    if (newRole === "cagri_temsilci") {
+      const rep = staff.find((s) => s.id === "usr-hakan") || staff.find((s) => s.role.includes("Çağrı"));
+      if (rep) setCurrentUser(rep);
+    } else if (newRole === "cagri_sefi") {
+      const leader = staff.find((s) => s.id === "usr-ayse") || staff.find((s) => s.isLeader);
+      if (leader) setCurrentUser(leader);
+    } else if (newRole === "pazarlama") {
+      const marketer = staff.find((s) => s.id === "usr-selin") || staff.find((s) => s.department?.includes("Pazarlama"));
+      if (marketer) setCurrentUser(marketer);
+    } else if (newRole === "kurgu") {
+      const editor = staff.find((s) => s.id === "usr-gokhan");
+      if (editor) setCurrentUser(editor);
+    } else if (newRole === "admin") {
+      const adminUser = staff.find((s) => s.id === "usr-gokhan") || staff[0];
+      if (adminUser) setCurrentUser(adminUser);
     }
   }
 
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  function getIcon(type: string) {
+    switch (type) {
+      case "task": return "assignment";
+      case "warning": return "warning";
+      default: return "info";
+    }
+  }
+
+  function getIconColor(type: string) {
+    switch (type) {
+      case "task": return "text-blue-600";
+      case "warning": return "text-amber-600";
+      default: return "text-slate-500";
+    }
+  }
+
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Şimdi";
+    if (mins < 60) return `${mins} dk önce`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} saat önce`;
+    return `${Math.floor(hours / 24)} gün önce`;
+  }
+
   return (
-    <header className="h-16 flex-shrink-0 bg-white border-b border-[#E2E8F0] px-6 lg:px-8 flex items-center justify-between z-10">
-      {/* Left: Page Title & System Badge */}
+    <header className="h-14 bg-white border-b border-[#E2E8F0] px-6 flex items-center justify-between shrink-0 z-10 relative">
+      {/* Left: Breadcrumb / Status / Preview Alert */}
+      <div className="flex items-center gap-3 text-sm">
+        <span className="text-[11px] font-mono text-slate-500">BCT-OS v2.4</span>
+        <span className="text-slate-300">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-medium text-emerald-700">Canlı Sistem</span>
+        </div>
+
+        {activeRole !== "admin" && (
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+            <span>👁️ Önizleme:</span>
+            <span>{activeRoleDef?.label}</span>
+            {currentUser && (
+              <span className="text-[10px] font-normal text-amber-800 ml-1">
+                ({currentUser.name})
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right: Role Switcher + Notification + Time */}
       <div className="flex items-center gap-3">
-        <h2 className="text-base font-semibold text-[#0F172A] tracking-tight">BCT-OS</h2>
-        <span className="text-xs text-slate-400 font-mono hidden sm:inline">Stüdyo Operasyon Çekirdeği</span>
-      </div>
-
-      {/* Center: Dynamic Flat Stat Pills */}
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-100 border border-slate-200/90 rounded-full text-xs font-medium text-slate-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          <span className="hidden md:inline">Stüdyoda Aktif:</span>
-          <span className="md:hidden">Stüdyo:</span>
-          <span className="font-semibold text-slate-900">{inStudioCount}</span>
-        </div>
-
-        <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-100 border border-slate-200/90 rounded-full text-xs font-medium text-slate-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-          <span>Kurguda:</span>
-          <span className="font-semibold text-slate-900">{inEditingCount}</span>
-        </div>
-
-        <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-100 border border-slate-200/90 rounded-full text-xs font-medium text-slate-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-          <span>Revizede:</span>
-          <span className="font-semibold text-slate-900">{inReviewCount}</span>
-        </div>
-      </div>
-
-      {/* Right: Quick actions & Demo Reset */}
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={handleReset}
-          title="Demo verilerini fabrika ayarlarına döndürür"
-          className={`text-xs px-2.5 py-1 rounded-md transition-all font-medium border flex items-center gap-1 cursor-pointer ${
-            resetConfirm
-              ? "bg-rose-50 border-rose-300 text-rose-700 font-semibold animate-pulse"
-              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[14px]">
-            {resetConfirm ? "warning" : "restart_alt"}
+        {/* Interactive Role Switcher for Admin Testing */}
+        <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+            <span>🛡️</span> Rol:
           </span>
-          <span className="hidden sm:inline">
-            {resetConfirm ? "Onay için tekrar tıkla" : "Demo Sıfırla"}
-          </span>
-        </button>
+          <select
+            value={activeRole}
+            onChange={(e) => handleRoleChange(e.target.value)}
+            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+            title="Sistemi farklı rollerin gözünden canlı test edin"
+          >
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label} {r.key === "admin" ? "(Süper Admin)" : `(${r.department})`}
+              </option>
+            ))}
+          </select>
 
-        <span className="text-xs text-slate-400 font-mono hidden lg:inline">BCT-HQ · Canlı</span>
+          {/* Çağrı Temsilcisi Seçici (Hakan Demir, Emre Çelik vb. arasındaki yetki farkını test etmek için) */}
+          {activeRole === "cagri_temsilci" && (
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
+              <span className="text-[10px] font-bold text-blue-600">👤 Temsilci:</span>
+              <select
+                value={currentUser?.id || "usr-hakan"}
+                onChange={(e) => {
+                  const found = staff.find((s) => s.id === e.target.value);
+                  if (found) setCurrentUser(found);
+                }}
+                className="bg-transparent text-xs font-bold text-blue-900 focus:outline-none cursor-pointer"
+                title="Hangi çağrı temsilcisinin gözünden test etmek istediğinizi seçin"
+              >
+                {staff
+                  .filter((s) => s.room && !s.isLeader && s.role.includes("Çağrı"))
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
+          {/* Çağrı Şefi Seçici (Oda 1, Oda 2, Oda 3 Şefleri Arasında Geçiş) */}
+          {activeRole === "cagri_sefi" && (
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
+              <span className="text-[10px] font-bold text-indigo-600">👑 Şef:</span>
+              <select
+                value={currentUser?.id || "usr-ayse"}
+                onChange={(e) => {
+                  const found = staff.find((s) => s.id === e.target.value);
+                  if (found) setCurrentUser(found);
+                }}
+                className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer"
+                title="Hangi oda şefinin gözünden test etmek istediğinizi seçin"
+              >
+                {staff
+                  .filter((s) => s.room && s.isLeader)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
+          {activeRole !== "admin" && (
+            <button
+              onClick={() => handleRoleChange("admin")}
+              className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold hover:bg-red-200 cursor-pointer transition ml-1"
+              title="Süper Admin Moduna Dön"
+            >
+              ✕ Admin'e Dön
+            </button>
+          )}
+        </div>
+        {/* Notification Bell */}
+        <div className="relative">
+          <button
+            onClick={() => setShowNotifs(!showNotifs)}
+            className="relative p-2 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-[#0F172A] transition-colors cursor-pointer"
+            title="Bildirimler"
+          >
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notification Dropdown */}
+          {showNotifs && (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 z-40" onClick={() => setShowNotifs(false)}></div>
+
+              <div className="absolute right-0 top-12 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
+                {/* Dropdown Header */}
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-[#0F172A]">Bildirimler</span>
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-100 text-red-700 font-semibold">
+                        {unreadCount} yeni
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => markAllNotificationsRead()}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                    >
+                      Tümünü Okundu Yap
+                    </button>
+                  )}
+                </div>
+
+                {/* Notification List */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-slate-400">
+                      Bildirim bulunmuyor
+                    </div>
+                  ) : (
+                    notifications.slice(0, 10).map((n) => (
+                      <div
+                        key={n.id}
+                        className={`px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer group ${
+                          !n.read ? "bg-blue-50/30" : ""
+                        }`}
+                        onClick={() => {
+                          markNotificationRead(n.id);
+                          if (n.link) {
+                            setShowNotifs(false);
+                          }
+                        }}
+                      >
+                        <span className={`material-symbols-outlined text-lg mt-0.5 shrink-0 ${getIconColor(n.type)}`}>
+                          {getIcon(n.type)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-[#0F172A] truncate">{n.title}</span>
+                            {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                          <span className="text-[11px] text-slate-400 mt-1 block">{timeAgo(n.createdAt)}</span>
+                        </div>
+                        {n.link && (
+                          <Link
+                            href={n.link}
+                            onClick={() => setShowNotifs(false)}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-800"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                          </Link>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(n.id);
+                          }}
+                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600"
+                          title="Sil"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Time */}
+        <div className="flex flex-col items-end">
+          <span className="text-sm font-semibold text-[#0F172A] font-mono tracking-wide">{timeStr}</span>
+          <span className="text-[11px] text-slate-500 capitalize">{dateStr}</span>
+        </div>
       </div>
     </header>
   );

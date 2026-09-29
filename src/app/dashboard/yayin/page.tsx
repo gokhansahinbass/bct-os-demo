@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import { updateGuestStatus } from "@/lib/store";
 
 export default function YayinPage() {
-  const { guests } = useStore();
+  const { guests, canAccessPage, activeRoleDef } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [archiveState, setArchiveState] = useState<"idle" | "loading" | "done">("idle");
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -52,6 +53,23 @@ export default function YayinPage() {
   const waText = encodeURIComponent(
     `Sayın ${activeGuest?.name || "Değerli Konuğumuz"}, BCT Stüdyo çekiminiz ve dijital kartınız hazırlanmıştır. Yayın tanıtım materyalleriniz ekte yer almaktadır.`
   );
+
+  if (!canAccessPage("/dashboard/yayin")) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-xl mx-auto my-12 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl border border-amber-200 shadow-inner">
+          🔒
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Erişim Yetkiniz Bulunmuyor</h2>
+        <p className="text-xs text-slate-500">
+          Mevcut rolünüz ({activeRoleDef?.label || "Rolünüz"}) Dijital Kart &amp; Yayın modülünü görüntüleme yetkisine sahip değildir.
+        </p>
+        <Link href="/dashboard" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition">
+          Ana Sayfaya Dön
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full">
@@ -113,7 +131,7 @@ export default function YayinPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-[#0F172A]">{g.name}</span>
-                        {g.vip && (
+                        {Boolean(g.services && g.services.length > 0 && g.services.some(s => s.price > 0)) && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             ★ VIP
                           </span>
@@ -134,7 +152,7 @@ export default function YayinPage() {
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500 mt-0.5">
                       <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200/60">
-                        📁 {g.hdd || "HDD-01"}
+                        🎥 {g.studio}
                       </span>
                       <span className="text-[#2563EB] font-medium text-[11px]">
                         {g.status === "archived" ? "Arşivlendi" : "Hazırlanıyor"}
@@ -173,7 +191,7 @@ export default function YayinPage() {
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold text-[#0F172A] tracking-tight">{activeGuest.name}</h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    ★ {activeGuest.videoPackage || "VIP Kalıcı Video Yayını"}
+                    ★ {activeGuest.services?.find((s) => s.type === "video")?.details?.[0]?.label || "Stüdyo Canlı Yayın"}
                   </span>
                 </div>
                 <p className="text-sm text-slate-500 mt-1">

@@ -1,20 +1,45 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { addGuest } from "@/lib/store";
+import { addGuest, type SocialMedia } from "@/lib/store";
 import Link from "next/link";
+
+const PLATFORM_OPTIONS = [
+  { key: "instagram", label: "Instagram", icon: "IG", prefix: "@", placeholder: "kullaniciadi" },
+  { key: "x", label: "X (Twitter)", icon: "X", prefix: "@", placeholder: "kullaniciadi" },
+  { key: "facebook", label: "Facebook", icon: "FB", prefix: "", placeholder: "facebook.com/sayfa" },
+  { key: "linkedin", label: "LinkedIn", icon: "IN", prefix: "", placeholder: "linkedin.com/in/isim" },
+  { key: "youtube", label: "YouTube", icon: "YT", prefix: "", placeholder: "youtube.com/@kanal" },
+  { key: "website", label: "Web Sitesi", icon: "WEB", prefix: "", placeholder: "alanadi.com" },
+  { key: "phone", label: "Telefon", icon: "TEL", prefix: "+90", placeholder: "(532) 000 00 00" },
+];
+
+const MAX_VIDEO_ITEMS = 4;
 
 export default function KioskPage() {
   const [fullName, setFullName] = useState("");
   const [title, setTitle] = useState("");
-  const [phone, setPhone] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [website, setWebsite] = useState("");
-  const [showIg, setShowIg] = useState(true);
-  const [showWeb, setShowWeb] = useState(true);
+  const [platformValues, setPlatformValues] = useState<Record<string, string>>({});
+  const [showInVideo, setShowInVideo] = useState<string[]>(["instagram", "website"]);
   const [confirmed, setConfirmed] = useState(true);
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "success">("idle");
   const [lastRegNo, setLastRegNo] = useState<string>("");
+
+  function setPlatformValue(key: string, value: string) {
+    setPlatformValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleVideoDisplay(key: string) {
+    setShowInVideo((prev) => {
+      if (prev.includes(key)) {
+        return prev.filter((k) => k !== key);
+      }
+      if (prev.length >= MAX_VIDEO_ITEMS) {
+        return prev; // Limit aşıldı, ekleme
+      }
+      return [...prev, key];
+    });
+  }
 
   const handleSubmit = useCallback(() => {
     if (!fullName.trim()) {
@@ -33,20 +58,30 @@ export default function KioskPage() {
     setSubmitState("loading");
 
     setTimeout(() => {
-      // BCT-OS Store'a gerçek misafir kaydı ekle
       const parts = title.includes("—") ? title.split("—") : title.split("-");
       const companyPart = parts[0]?.trim() || title.trim();
       const titlePart = parts.length > 1 ? parts.slice(1).join("—").trim() : "Konuk";
+
+      const socialMedia: SocialMedia = {
+        instagram: (platformValues.instagram || "").replace("@", "").trim(),
+        x: (platformValues.x || "").replace("@", "").trim(),
+        facebook: (platformValues.facebook || "").trim(),
+        linkedin: (platformValues.linkedin || "").trim(),
+        youtube: (platformValues.youtube || "").trim(),
+        website: (platformValues.website || "").trim(),
+        phone: (platformValues.phone || "").trim(),
+        showInVideo,
+      };
 
       const created = addGuest({
         name: fullName.trim(),
         company: companyPart,
         title: titlePart,
-        phone: phone.trim() || "+90 (500) 000 00 00",
-        instagram: instagram.replace("@", "").trim(),
-        website: website.trim(),
-        showIg,
-        showWeb,
+        phone: socialMedia.phone || "+90 (500) 000 00 00",
+        instagram: socialMedia.instagram || "",
+        website: socialMedia.website || "",
+        showIg: showInVideo.includes("instagram"),
+        showWeb: showInVideo.includes("website"),
         vip: false,
         status: "kiosk_registered",
         representative: "Kiosk Girişi",
@@ -54,35 +89,38 @@ export default function KioskPage() {
         shootTime: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
         shootDuration: "25 dk",
         studio: "Stüdyo A",
-        hdd: "HDD Bekleniyor",
         editor: "",
         amount: "0",
-        paymentStatus: "Beklemede",
-        videoPackage: "Paket Bekliyor",
-        magazinePackage: "Beklemede",
-        pressDistribution: false,
+        paymentStatus: "odenmedi",
+        onOdemeMiktari: 0,
+        socialMedia,
       });
 
       setLastRegNo(created.registrationNo);
       setSubmitState("success");
 
-      // Formu temizle
       setTimeout(() => {
         setFullName("");
         setTitle("");
-        setPhone("");
-        setInstagram("");
-        setWebsite("");
+        setPlatformValues({});
+        setShowInVideo(["instagram", "website"]);
         setSubmitState("idle");
       }, 4000);
     }, 800);
-  }, [fullName, title, phone, instagram, website, showIg, showWeb, confirmed]);
+  }, [fullName, title, platformValues, showInVideo, confirmed]);
 
   const previewName = fullName.trim() ? fullName.toUpperCase() : "MİSAFİR AD SOYAD";
   const previewTitle = title.trim() ? title : "Firma & Unvan Bilgisi (Örn: Yazılım A.Ş. — Kurucu Ortak)";
-  const cleanIg = instagram.trim().replace(/^@/, "");
-  const previewIg = cleanIg ? "@" + cleanIg : "@kullanici";
-  const previewWeb = website.trim() || "alanadi.com";
+
+  // Önizleme için videoda gösterilecek öğeler
+  const videoPreviewItems = showInVideo
+    .map((key) => {
+      const platform = PLATFORM_OPTIONS.find((p) => p.key === key);
+      const value = platformValues[key];
+      if (!platform || !value?.trim()) return null;
+      return { icon: platform.icon, value: platform.prefix && !value.startsWith(platform.prefix) ? platform.prefix + value : value };
+    })
+    .filter(Boolean);
 
   return (
     <div className="bg-[#F8FAFC] text-slate-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
@@ -110,9 +148,9 @@ export default function KioskPage() {
       {/* Main Kiosk Container */}
       <main className="w-full max-w-5xl bg-white border border-[#E2E8F0] rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden flex flex-col md:flex-row">
         {/* LEFT COLUMN: Form */}
-        <div className="w-full md:w-[55%] p-6 sm:p-8 md:p-10 flex flex-col justify-between space-y-6 bg-white">
+        <div className="w-full md:w-[55%] p-6 sm:p-8 md:p-10 flex flex-col justify-between space-y-5 bg-white">
           <div>
-            <div className="mb-6">
+            <div className="mb-5">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Stüdyo Kayıt Formu</h1>
               <p className="text-sm text-slate-500 mt-1">Lütfen alt bantta (KJ) yer alacak bilgilerinizi eksiksiz giriniz.</p>
             </div>
@@ -156,75 +194,63 @@ export default function KioskPage() {
                 </div>
               </div>
 
-              {/* Telefon */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700" htmlFor="input-phone">
-                  Telefon Numarası <span className="text-slate-400 font-normal">(WhatsApp video teslimatı için)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    autoComplete="off"
-                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-800 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400 font-mono"
-                    id="input-phone"
-                    placeholder="+90 (532) 000 00 00"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                  <span className="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px] pointer-events-none">phone</span>
-                </div>
-              </div>
-
-              {/* Social Toggles */}
-              <div className="pt-1 space-y-3">
-                {/* Instagram */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-700" htmlFor="input-instagram">Instagram (@)</label>
-                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                      <span className="text-xs font-medium text-slate-600">Videoda Göster</span>
-                      <div className="relative">
-                        <input type="checkbox" checked={showIg} onChange={(e) => setShowIg(e.target.checked)} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </div>
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium select-none">@</span>
-                    <input
-                      className="w-full rounded-lg border border-slate-200 pl-8 pr-4 py-3 text-slate-800 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
-                      id="input-instagram"
-                      placeholder="kullaniciadi"
-                      type="text"
-                      value={instagram}
-                      onChange={(e) => setInstagram(e.target.value)}
-                    />
-                  </div>
+              {/* Platform Bilgileri */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Sosyal Medya & İletişim Bilgileri</label>
+                  <span className={`text-[11px] font-medium ${showInVideo.length >= MAX_VIDEO_ITEMS ? "text-amber-600" : "text-slate-400"}`}>
+                    Video: {showInVideo.length}/{MAX_VIDEO_ITEMS}
+                  </span>
                 </div>
 
-                {/* Web Sitesi */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-700" htmlFor="input-website">Web Sitesi</label>
-                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                      <span className="text-xs font-medium text-slate-600">Videoda Göster</span>
-                      <div className="relative">
-                        <input type="checkbox" checked={showWeb} onChange={(e) => setShowWeb(e.target.checked)} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                {showInVideo.length >= MAX_VIDEO_ITEMS && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    <span className="material-symbols-outlined text-amber-600 text-sm">warning</span>
+                    Alt bantta en fazla {MAX_VIDEO_ITEMS} bilgi gösterilebilir. Daha fazla eklemek için birini kaldırın.
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {PLATFORM_OPTIONS.map((platform) => {
+                    const value = platformValues[platform.key] || "";
+                    const isInVideo = showInVideo.includes(platform.key);
+                    const isLimitReached = showInVideo.length >= MAX_VIDEO_ITEMS && !isInVideo;
+
+                    return (
+                      <div key={platform.key} className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {platform.icon}
+                        </span>
+                        <div className="relative flex-1">
+                          {platform.prefix && (
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium select-none">{platform.prefix}</span>
+                          )}
+                          <input
+                            className={`w-full rounded-lg border border-slate-200 ${platform.prefix ? "pl-8" : "pl-3"} pr-3 py-2 text-slate-800 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400`}
+                            placeholder={platform.placeholder}
+                            type="text"
+                            value={value}
+                            onChange={(e) => setPlatformValue(platform.key, e.target.value)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleVideoDisplay(platform.key)}
+                          disabled={isLimitReached}
+                          className={`shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${
+                            isInVideo
+                              ? "bg-blue-50 border-blue-200 text-blue-700"
+                              : isLimitReached
+                              ? "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
+                              : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                          }`}
+                          title={isInVideo ? "Videodan kaldır" : isLimitReached ? "Limit aşıldı" : "Videoda göster"}
+                        >
+                          {isInVideo ? "📺 Video" : "Ekle"}
+                        </button>
                       </div>
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">language</span>
-                    <input
-                      className="w-full rounded-lg border border-slate-200 pl-10 pr-4 py-3 text-slate-800 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
-                      id="input-website"
-                      placeholder="alanadi.com"
-                      type="text"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                    />
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -308,20 +334,16 @@ export default function KioskPage() {
                   <div className="text-[15px] font-medium text-slate-600 mt-0.5 leading-snug truncate">
                     {previewTitle}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-100">
-                    {showIg && cleanIg && (
-                      <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-xs font-mono">
-                        <span className="font-bold text-[10px] text-slate-400">IG</span>
-                        <span>{previewIg}</span>
-                      </div>
-                    )}
-                    {showWeb && website.trim() && (
-                      <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-xs font-mono">
-                        <span className="font-bold text-[10px] text-slate-400">WEB</span>
-                        <span>{previewWeb}</span>
-                      </div>
-                    )}
-                  </div>
+                  {videoPreviewItems.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-100">
+                      {videoPreviewItems.map((item, i) => (
+                        <div key={i} className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-xs font-mono">
+                          <span className="font-bold text-[10px] text-slate-400">{item!.icon}</span>
+                          <span>{item!.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

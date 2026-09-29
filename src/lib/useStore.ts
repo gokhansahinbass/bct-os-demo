@@ -1,13 +1,28 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   getGuests,
   getStaff,
+  getNotifications,
+  getRooms,
+  getRoles,
+  getCurrentUser,
+  setCurrentUser as storeSetCurrentUser,
+  getActiveRole,
+  setActiveRole as storeSetActiveRole,
+  hasRolePermission,
+  canRoleAccessPath,
+  canRoleAccessRoom,
+  isRoleRestricted,
+  canUserManageGuestStatus,
   subscribe,
   type Guest,
   type GuestStatus,
   type StaffMember,
+  type Notification,
+  type Room,
+  type RoleDefinition,
 } from "@/lib/store";
 
 /**
@@ -17,11 +32,21 @@ import {
 export function useStore() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roles, setRoles] = useState<RoleDefinition[]>([]);
+  const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
+  const [activeRole, setLocalActiveRole] = useState<string>("admin");
   const [isLoaded, setIsLoaded] = useState(false);
 
   const refresh = useCallback(() => {
     setGuests(getGuests());
     setStaff(getStaff());
+    setNotifications(getNotifications());
+    setRooms(getRooms());
+    setRoles(getRoles());
+    setLocalCurrentUser(getCurrentUser());
+    setLocalActiveRole(getActiveRole());
     setIsLoaded(true);
   }, []);
 
@@ -33,6 +58,43 @@ export function useStore() {
     };
   }, [refresh]);
 
+  const activeRoleDef = useMemo(() => {
+    return roles.find((r) => r.key === activeRole) || roles.find((r) => r.key === "admin") || null;
+  }, [roles, activeRole]);
+
+  const setActiveRole = useCallback((roleKey: string) => {
+    storeSetActiveRole(roleKey);
+    setLocalActiveRole(roleKey);
+  }, []);
+
+  const setCurrentUser = useCallback((user: StaffMember | null) => {
+    storeSetCurrentUser(user);
+    setLocalCurrentUser(user);
+  }, []);
+
+  const hasPermission = useCallback((permKey: string) => {
+    return hasRolePermission(activeRole, permKey);
+  }, [activeRole]);
+
+  const canAccessPage = useCallback((pathname: string) => {
+    return canRoleAccessPath(activeRole, pathname);
+  }, [activeRole]);
+
+  const canAccessRoom = useCallback((roomId: string) => {
+    return canRoleAccessRoom(activeRole, roomId);
+  }, [activeRole]);
+
+  const isSensitiveBlurred = useCallback((restrictionKey: "montaj" | "revize" | "revenue" | "contact") => {
+    return isRoleRestricted(activeRole, restrictionKey);
+  }, [activeRole]);
+
+  const canManageGuest = useCallback(
+    (guest: Guest, roomLeaderName?: string) => {
+      return canUserManageGuestStatus(currentUser, activeRole, guest, roomLeaderName);
+    },
+    [currentUser, activeRole]
+  );
+
   const byStatus = useCallback(
     (...statuses: GuestStatus[]) => guests.filter((g) => statuses.includes(g.status)),
     [guests]
@@ -43,5 +105,40 @@ export function useStore() {
     [guests]
   );
 
-  return { guests, staff, byStatus, byId, refresh, isLoaded };
+  const byRoom = useCallback(
+    (roomId: string) => guests.filter((g) => g.room === roomId),
+    [guests]
+  );
+
+  const staffByRoom = useCallback(
+    (roomId: string) => staff.filter((s) => s.room === roomId),
+    [staff]
+  );
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  return {
+    guests,
+    staff,
+    notifications,
+    rooms,
+    roles,
+    currentUser,
+    activeRole,
+    activeRoleDef,
+    setActiveRole,
+    setCurrentUser,
+    hasPermission,
+    canAccessPage,
+    canAccessRoom,
+    isSensitiveBlurred,
+    canManageGuest,
+    byStatus,
+    byId,
+    byRoom,
+    staffByRoom,
+    unreadCount,
+    refresh,
+    isLoaded,
+  };
 }
