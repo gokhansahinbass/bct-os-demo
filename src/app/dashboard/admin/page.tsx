@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useStore } from "@/lib/useStore";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   addStaff,
   toggleStaffStatus,
@@ -17,9 +18,11 @@ import {
 } from "@/lib/store";
 
 export default function AdminPage() {
-  const { staff, guests, roles, canAccessPage } = useStore();
+  const { staff, guests, roles, rooms, canAccessPage } = useStore();
   const [activeTab, setActiveTab] = useState<"staff" | "rbac" | "system">("staff");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
 
   if (!canAccessPage("/dashboard/admin")) {
     return null;
@@ -240,6 +243,49 @@ export default function AdminPage() {
     if (!confirm("Tüm personel şifreleri, roller ve demo verileri fabrika ayarlarına sıfırlansın mı?")) return;
     resetToDefaults();
     setFeedback("✓ Sistem ve yetkiler fabrika ayarlarına başarıyla sıfırlandı.");
+    setTimeout(() => setFeedback(null), 4000);
+  }
+
+  // Supabase Senkronizasyonu
+  async function handleSyncToSupabase() {
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guests, staff, roles, rooms }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback(data.message || "✓ Veriler Supabase veritabanına aktarıldı.");
+      } else {
+        alert(data.message || "Senkronizasyon başarısız.");
+      }
+    } catch (err: any) {
+      alert("Senkronizasyon hatası: " + err.message);
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setFeedback(null), 6000);
+    }
+  }
+
+  // Tam Yedek İndirme (JSON)
+  function handleExportBackup() {
+    const backupData = {
+      exportDate: new Date().toISOString(),
+      staff,
+      guests,
+      roles,
+      rooms,
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BCT_OS_Backup_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setFeedback("✓ Tam veritabanı yedeği JSON dosyası olarak indirildi.");
     setTimeout(() => setFeedback(null), 4000);
   }
 
@@ -806,7 +852,29 @@ export default function AdminPage() {
       {activeTab === "system" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-6">
-            <h2 className="text-base font-bold text-[#0F172A]">Sistem Durumu &amp; Veritabanı</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-[#0F172A]">Sistem Durumu &amp; Veritabanı</h2>
+                <p className="text-xs text-slate-500">Mevcut sistem kapasitesi ve kalıcı bulut veritabanı durumu</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                    isSupabaseConfigured
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isSupabaseConfigured ? "bg-emerald-500 animate-pulse" : "bg-blue-500"
+                    }`}
+                  ></span>
+                  <span>{isSupabaseConfigured ? "Supabase Bulut DB Aktif" : "Supabase Hazır (Yapılandırma Bekleniyor)"}</span>
+                </span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">
                 <span className="text-xs text-slate-500 font-semibold block mb-1">Toplam Konuk</span>
@@ -822,23 +890,101 @@ export default function AdminPage() {
               </div>
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">
                 <span className="text-xs text-slate-500 font-semibold block mb-1">Satış Odası</span>
-                <span className="text-2xl font-bold text-indigo-600 font-mono">3 Oda</span>
+                <span className="text-2xl font-bold text-indigo-600 font-mono">{rooms.length || 3} Oda</span>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Fabrika Ayarlarına Sıfırlama
-              </h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Tüm personelleri, atanmış şifreleri, rolleri ve demo konuk kayıtlarını ilk durumuna geri getirir.
-              </p>
-              <button
-                onClick={handleResetData}
-                className="px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-bold border border-red-200 transition cursor-pointer"
-              >
-                Fabrika Ayarlarına Sıfırla
-              </button>
+            {/* Supabase Bulut Veritabanı Entegrasyon Kartı */}
+            <div className="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-2xl shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-xl shrink-0">
+                    🐘
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Supabase (PostgreSQL) Prodüksiyon Senkronizasyonu</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/30 text-blue-200 border border-blue-400/40">
+                        50+ KULLANICI HAZIR
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Farklı cihazlardan (telefon, tablet, bilgisayar) bağlanan tüm ekiplerin aynı canlı veritabanında çalışmasını sağlar.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setShowSqlModal(true)}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition cursor-pointer border border-white/15"
+                  >
+                    SQL Şemasını Gör
+                  </button>
+
+                  <button
+                    disabled={syncLoading}
+                    onClick={handleSyncToSupabase}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 disabled:bg-blue-800"
+                  >
+                    {syncLoading ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span>
+                        <span>Aktarılıyor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⚡</span>
+                        <span>Tüm Verileri Supabase'e Aktar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span>
+                  <span>Şema: <code>supabase/schema.sql</code> hazır</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span>
+                  <span>Otomatik RLS Güvenlik Kuralları</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span>
+                  <span>API Uç Noktaları: <code>/api/guests</code> &amp; <code>/api/staff</code></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Yedekleme & Fabrika Ayarları */}
+            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">
+                  Yedekleme &amp; Sıfırlama
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Verilerinizi JSON dosyası olarak bilgisayarınıza indirebilir veya sistemi fabrika ayarlarına sıfırlayabilirsiniz.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportBackup}
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>📥</span>
+                  <span>Yedek İndir (JSON)</span>
+                </button>
+
+                <button
+                  onClick={handleResetData}
+                  className="px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-bold border border-red-200 transition cursor-pointer"
+                >
+                  Fabrika Ayarlarına Sıfırla
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1258,6 +1404,161 @@ export default function AdminPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* MODAL: SUPABASE SQL ŞEMASI GÖRÜNTÜLEME */}
+      {showSqlModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowSqlModal(false);
+          }}
+        >
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-bold text-base text-[#0F172A] flex items-center gap-2">
+                  <span>🐘</span>
+                  <span>Supabase (PostgreSQL) Tablo ve Güvenlik Şeması</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Bu SQL kodunu Supabase Dashboard &gt; SQL Editor alanına yapıştırıp "Run" tuşuna basınız.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
+                <span className="font-bold block">Kurulum Adımları:</span>
+                <ol className="list-decimal pl-4 space-y-0.5 text-blue-800">
+                  <li><strong>supabase.com</strong> adresinde ücretsiz bir proje oluşturun.</li>
+                  <li>Sol menüden <strong>SQL Editor</strong> bölümüne gidin.</li>
+                  <li>Aşağıdaki SQL şemasını yapıştırıp <strong>RUN</strong> butonuna basın.</li>
+                  <li><strong>Project Settings &gt; API</strong> sayfasındaki URL ve anon key değerlerini Vercel ortam değişkenlerine ekleyin.</li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center justify-between pb-1.5 text-xs text-slate-500 font-mono">
+                  <span>supabase/schema.sql</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`-- BCT-OS PostgreSQL Schema
+CREATE TABLE IF NOT EXISTS public.roles (id TEXT PRIMARY KEY, key TEXT UNIQUE NOT NULL, label TEXT NOT NULL, color TEXT NOT NULL, department TEXT NOT NULL, permissions JSONB NOT NULL DEFAULT '{}'::jsonb);
+CREATE TABLE IF NOT EXISTS public.rooms (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, color TEXT NOT NULL, staff_ids JSONB NOT NULL DEFAULT '[]'::jsonb);
+CREATE TABLE IF NOT EXISTS public.staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL DEFAULT 'bct123', role TEXT NOT NULL, department TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', avatar TEXT NOT NULL, room TEXT, is_leader BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS public.guests (id TEXT PRIMARY KEY, name TEXT NOT NULL, company TEXT NOT NULL, title TEXT NOT NULL, phone TEXT NOT NULL, instagram TEXT, website TEXT, show_ig BOOLEAN NOT NULL DEFAULT FALSE, show_web BOOLEAN NOT NULL DEFAULT FALSE, vip BOOLEAN NOT NULL DEFAULT FALSE, status TEXT NOT NULL DEFAULT 'appointment_set', representative TEXT NOT NULL, appointment_date TEXT, appointment_time TEXT, shoot_time TEXT, shoot_duration TEXT, studio TEXT, editor TEXT, amount TEXT NOT NULL DEFAULT '0', payment_status TEXT NOT NULL DEFAULT 'odenmedi', on_odeme_miktari NUMERIC NOT NULL DEFAULT 0, registration_no TEXT UNIQUE NOT NULL, room TEXT, marketer TEXT, cancelled_reason TEXT, cancelled_at TEXT, services JSONB NOT NULL DEFAULT '[]'::jsonb, social_media JSONB NOT NULL DEFAULT '{}'::jsonb, notes JSONB NOT NULL DEFAULT '[]'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS public.audit_logs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), actor_id TEXT, actor_name TEXT, action TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, details JSONB DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+ALTER TABLE public.guests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Guests" ON public.guests FOR SELECT USING (true);
+CREATE POLICY "Public Write Guests" ON public.guests FOR ALL USING (true);
+CREATE POLICY "Public Read Staff" ON public.staff FOR SELECT USING (true);
+CREATE POLICY "Public Write Staff" ON public.staff FOR ALL USING (true);`);
+                      setFeedback("✓ SQL Şeması panoya kopyalandı!");
+                      setTimeout(() => setFeedback(null), 3000);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+                  >
+                    📋 Panoya Kopyala
+                  </button>
+                </div>
+                <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-60 leading-relaxed">
+{`-- 1. Eklentileri Etkinleştir
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 2. Roller Tablosu
+CREATE TABLE IF NOT EXISTS public.roles (
+    id TEXT PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT 'blue',
+    department TEXT NOT NULL,
+    permissions JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+-- 3. Odalar Tablosu
+CREATE TABLE IF NOT EXISTS public.rooms (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    color TEXT NOT NULL DEFAULT '#2563EB',
+    staff_ids JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+-- 4. Personel Tablosu (50+ Kullanıcı)
+CREATE TABLE IF NOT EXISTS public.staff (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT 'bct123',
+    role TEXT NOT NULL,
+    department TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    avatar TEXT NOT NULL DEFAULT 'ST',
+    room TEXT REFERENCES public.rooms(id),
+    is_leader BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. Konuklar ve Hizmetler Tablosu
+CREATE TABLE IF NOT EXISTS public.guests (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT 'Yönetici',
+    phone TEXT NOT NULL,
+    instagram TEXT DEFAULT '',
+    website TEXT DEFAULT '',
+    show_ig BOOLEAN NOT NULL DEFAULT FALSE,
+    show_web BOOLEAN NOT NULL DEFAULT FALSE,
+    vip BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'appointment_set',
+    representative TEXT NOT NULL,
+    appointment_date TEXT,
+    appointment_time TEXT,
+    shoot_time TEXT,
+    shoot_duration TEXT DEFAULT '25 dk',
+    studio TEXT DEFAULT 'Stüdyo A (4K)',
+    editor TEXT DEFAULT '',
+    amount TEXT NOT NULL DEFAULT '0',
+    payment_status TEXT NOT NULL DEFAULT 'odenmedi',
+    on_odeme_miktari NUMERIC NOT NULL DEFAULT 0,
+    registration_no TEXT UNIQUE NOT NULL,
+    room TEXT REFERENCES public.rooms(id),
+    marketer TEXT,
+    cancelled_reason TEXT,
+    cancelled_at TEXT,
+    services JSONB NOT NULL DEFAULT '[]'::jsonb,
+    social_media JSONB NOT NULL DEFAULT '{}'::jsonb,
+    notes JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);`}
+                </pre>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+              <span className="text-xs text-slate-500">Tam dosya konumu: <code>supabase/schema.sql</code></span>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
