@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { updateGuest, type Guest } from "@/lib/store";
+import { updateGuest, getGuestDeadlineInfo, type Guest } from "@/lib/store";
 
 export default function MontajPage() {
   const { guests, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
@@ -22,14 +22,25 @@ export default function MontajPage() {
     return guests.filter((g) => g.name.toLowerCase().includes(q) || g.company.toLowerCase().includes(q));
   }, [guests, search]);
 
-  // Column 1: Kurgu Bekleyen
+  // Sözleşmeli 25 Günlük Süreye Göre Aciliyet Sıralaması (Kalan günü en az olan en üstte!)
+  const sortByDeadline = (list: Guest[]) => {
+    return [...list].sort((a, b) => {
+      const da = getGuestDeadlineInfo(a).remainingDays;
+      const db = getGuestDeadlineInfo(b).remainingDays;
+      return da - db;
+    });
+  };
+
+  // Column 1: Kurgu Bekleyen (Aciliyet Sıralı)
   const bekleyen = useMemo(() => {
-    return filtered.filter((g) => ["package_set", "shoot_done", "kiosk_registered"].includes(g.status));
+    const list = filtered.filter((g) => ["package_set", "shoot_done", "kiosk_registered"].includes(g.status));
+    return sortByDeadline(list);
   }, [filtered]);
 
-  // Column 2: Kurguda
+  // Column 2: Kurguda (Aciliyet Sıralı)
   const kurguda = useMemo(() => {
-    return filtered.filter((g) => g.status === "editing");
+    const list = filtered.filter((g) => g.status === "editing");
+    return sortByDeadline(list);
   }, [filtered]);
 
   // Column 3: İzlemeye Gidenler / Bitenler
@@ -77,6 +88,53 @@ export default function MontajPage() {
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-500 flex-shrink-0 font-medium">
         Ücretsiz
       </span>
+    );
+  };
+
+  // ── 25 Günlük Zorunlu Sözleşme Süresi Gösterge Rozeti ──
+  const DeadlineBadge = ({ card }: { card: Guest }) => {
+    const info = getGuestDeadlineInfo(card);
+    let colorClass = "bg-blue-50 text-blue-800 border-blue-200 font-bold";
+    let icon = "schedule";
+    let barColor = "bg-blue-600";
+
+    if (info.isExpired) {
+      colorClass = "bg-red-600 text-white border-red-700 font-bold animate-pulse";
+      icon = "warning";
+      barColor = "bg-red-600";
+    } else if (info.isCritical) {
+      colorClass = "bg-rose-100 text-rose-800 border-rose-300 font-bold";
+      icon = "local_fire_department";
+      barColor = "bg-rose-600";
+    } else if (info.isWarning) {
+      colorClass = "bg-amber-100 text-amber-900 border-amber-300 font-semibold";
+      icon = "hourglass_top";
+      barColor = "bg-amber-500";
+    }
+
+    return (
+      <div className="flex flex-col gap-1.5 w-full bg-slate-50/90 p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-slate-600 font-medium flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px] text-slate-400">gavel</span>
+            25 Gün Yayın Sözleşmesi:
+          </span>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border shadow-2xs ${colorClass}`}>
+            <span className="material-symbols-outlined text-[13px]">{icon}</span>
+            {info.label}
+          </span>
+        </div>
+        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${barColor}`}
+            style={{ width: `${info.percentageElapsed}%` }}
+          ></div>
+        </div>
+        <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
+          <span>Stüdyo Geliş: {info.arrivalDate.toLocaleDateString("tr-TR")}</span>
+          <span>Son Yayın Tarihi: {info.deadlineDate.toLocaleDateString("tr-TR")}</span>
+        </div>
+      </div>
     );
   };
 
@@ -162,6 +220,28 @@ export default function MontajPage() {
         </div>
       </section>
 
+      {/* 25 Gün Sözleşme Kuralı Bilgilendirme Bandı */}
+      <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-amber-50/70 border border-blue-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">
+            <span className="material-symbols-outlined text-[22px]">timer</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900">Sözleşmeli 25 Günlük Zorunlu Yayın Kuralı</h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">Otomatik Sıralama</span>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Tüm konukların (ücretli veya ücretsiz) çekimleri sözleşme gereği stüdyo tarihinden itibaren <strong>en geç 25 gün</strong> içinde yayına verilmelidir. Kurgu listeleri son güne kalan aciliyete göre otomatik sıralanmaktadır.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-700 bg-white/80 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          <span>Kritik Eşik: &le; 5 Gün</span>
+        </div>
+      </div>
+
       {/* Kanban Board */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         {/* Column 1: Kurgu Bekleyen */}
@@ -205,6 +285,9 @@ export default function MontajPage() {
                         {card.shootTime} ({card.shootDuration})
                       </span>
                     </div>
+
+                    {/* 25 Günlük Yayın Süresi Sayacı & İlerleme */}
+                    <DeadlineBadge card={card} />
 
                     {/* Revize Notları Preview if any */}
                     {unresNotes.length > 0 && (
@@ -297,6 +380,9 @@ export default function MontajPage() {
                       <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                     </div>
 
+                    {/* 25 Günlük Yayın Süresi Sayacı & İlerleme */}
+                    <DeadlineBadge card={card} />
+
                     {/* Revize Notları Detail */}
                     {unresNotes.length > 0 && (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs flex flex-col gap-1.5">
@@ -385,6 +471,9 @@ export default function MontajPage() {
                     </span>
                     <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                   </div>
+
+                  {/* 25 Günlük Yayın Süresi Durumu */}
+                  <DeadlineBadge card={card} />
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-[11px]">
                     <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
                     {card.status === "review_approved" ? "Onaylandı → Dijital Kartta" : "İzleme Masasında İnceleniyor"}

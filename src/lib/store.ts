@@ -117,6 +117,19 @@ export interface RevisionNote {
   createdAt: string;
 }
 
+// ── YouTube Metadata Modeli (Yalnızca Ücretli Konuklar) ──
+export interface YouTubeMetadata {
+  status?: "bekliyor" | "yuklendi" | "yayinda";
+  youtubeUrl?: string;
+  customTitle?: string;
+  customDescription?: string;
+  playlist?: string;
+  publishDate?: string;
+  publishTime?: string;
+  tags?: string[];
+  uploadedAt?: string;
+}
+
 // ── Konuk (Guest) Arayüzü ──
 
 export interface Guest {
@@ -150,6 +163,7 @@ export interface Guest {
   marketer?: string;          // Satışı üstlenen pazarlamacı (Pazarlama Masası)
   cancelledReason?: string;   // İptal gerekçesi
   cancelledAt?: string;       // İptal edilme tarihi
+  youtubeMetadata?: YouTubeMetadata; // YouTube yayın takibi ve otomasyonu
 }
 
 // ── Personel (Staff) Arayüzü ──
@@ -2716,6 +2730,323 @@ export function canUserManageGuestStatus(
   }
 
   return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── 25 Günlük Sözleşme Süresi & Aciliyet Önceliklendirme Sistemi ──
+// ════════════════════════════════════════════════════════════════════
+
+export interface GuestDeadlineInfo {
+  arrivalDate: Date;
+  deadlineDate: Date;
+  remainingDays: number;
+  isExpired: boolean;
+  isCritical: boolean; // <= 3 days
+  isWarning: boolean;  // <= 7 days
+  percentageElapsed: number; // 0-100%
+  label: string;
+}
+
+/**
+ * Konuğun stüdyoya geliş / sözleşme tarihinden itibaren 25 günlük zorunlu yayın süresini hesaplar.
+ * Sözleşme Kuralı: İster ücretli ister ücretsiz olsun, her konuğun videosu en geç 25 gün içinde canlı yayına alınmalıdır.
+ * Kurgu montaj masasında kurgucunun tarihi en yakın olanı önce bitirmesi için kullanılır.
+ */
+export function getGuestDeadlineInfo(guest: Guest): GuestDeadlineInfo {
+  let arrivalDate: Date;
+  if (guest.createdAt) {
+    arrivalDate = new Date(guest.createdAt);
+  } else if (guest.appointmentDate) {
+    arrivalDate = new Date(guest.appointmentDate);
+  } else {
+    arrivalDate = new Date();
+  }
+  if (isNaN(arrivalDate.getTime())) {
+    arrivalDate = new Date();
+  }
+
+  // 25 Günlük Sözleşme Süresi
+  const deadlineDate = new Date(arrivalDate.getTime() + 25 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+
+  const diffMs = deadlineDate.getTime() - now.getTime();
+  const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const elapsedDays = 25 - remainingDays;
+  const percentageElapsed = Math.min(100, Math.max(0, Math.round((elapsedDays / 25) * 100)));
+
+  const isExpired = remainingDays <= 0;
+  const isCritical = remainingDays > 0 && remainingDays <= 3;
+  const isWarning = remainingDays > 3 && remainingDays <= 7;
+
+  let label = `${remainingDays} Gün Kaldı`;
+  if (isExpired) {
+    label = `Süresi ${Math.abs(remainingDays)} Gün Geçti!`;
+  } else if (remainingDays === 1) {
+    label = `Son 1 Gün! (Yarın)`;
+  } else if (remainingDays === 0) {
+    label = `Bugün Son Gün!`;
+  } else if (isCritical) {
+    label = `Son ${remainingDays} Gün!`;
+  }
+
+  return {
+    arrivalDate,
+    deadlineDate,
+    remainingDays,
+    isExpired,
+    isCritical,
+    isWarning,
+    percentageElapsed,
+    label,
+  };
+}
+
+/**
+ * Konuğun ücretli mi yoksa ücretsiz mi olduğunu belirler.
+ * Ücretli konuklar: Dijital Kart, Canlı Yayın ve YouTube'a gider.
+ * Ücretsiz konuklar: Yalnızca Canlı Yayına gider, dijital kart ve YouTube açıklaması hazırlanmaz, yayın sonrası silinir.
+ */
+export function isGuestPaid(guest: Guest): boolean {
+  if (guest.paymentStatus === "ucretsiz") return false;
+  if (guest.amount && Number(guest.amount) > 0) return true;
+  if (guest.paymentStatus === "tamamlandi" || guest.paymentStatus === "on_odeme") return true;
+  if (guest.services && guest.services.some((s) => s.price > 0)) return true;
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── Akıllı Yayın Takvimi & Canlı Yayın Kuşağı Motoru (11:30 - 19:00) ──
+// ════════════════════════════════════════════════════════════════════
+
+export const BROADCAST_DAILY_HOURS = [
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+  "17:00",
+  "17:30",
+  "18:00",
+  "18:30",
+  "19:00",
+] as const;
+
+export function isSlotPrimeTime(timeStr: string): boolean {
+  // 12:00 ile 16:00 arası günün en popüler Prime Time saatleridir
+  return ["12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"].includes(timeStr);
+}
+
+export interface BroadcastSlot {
+  id: string;
+  date: string;          // "YYYY-MM-DD" e.g. "2026-10-02"
+  time: string;          // "11:30", "12:00", ... "19:00"
+  isPrimeTime: boolean;  // 12:00 - 16:00 arası
+  guestId?: string;
+  guestName: string;
+  company: string;
+  title: string;
+  isPaid: boolean;
+  isRepeat: boolean;     // Arşiv tekrar yayını mı?
+  customNotes?: string;
+  status: "planlandi" | "canli_yayinda" | "yayinlandi" | "tamamlandi" | "iptal";
+  updatedAt: string;
+}
+
+export const BROADCAST_SCHEDULES_STORAGE_KEY = "bct_broadcast_schedules";
+
+function loadBroadcastSchedules(): BroadcastSlot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(BROADCAST_SCHEDULES_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+export function saveBroadcastSchedules(schedules: BroadcastSlot[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(BROADCAST_SCHEDULES_STORAGE_KEY, JSON.stringify(schedules));
+  notify();
+}
+
+/**
+ * Akıllı Yayın Takvimi Oluşturucu (Smart Schedule Generator):
+ * Kural 1: Saat 11:30 - 19:00 arası her 30 dakikada bir (günde 16 yayın kuşağı).
+ * Kural 2: 12:00 - 16:00 arası günün en popüler Prime saatleridir; yeni ve ücretli konuklara verilir.
+ * Kural 3: Ücretsiz konuklar diğer saatlere (11:30, 16:30 - 19:00) dağıtılır.
+ * Kural 4: Ücretli konuk sayısı o günün prime saatlerinden (9 slot) fazlaysa ertesi günün Prime saatlerine devreder.
+ * Kural 5: Boş kalan slotlara geçmişte yayınlanmış arşiv ücretli tekrarları veya yayınlanmamış konuklar doldurulur.
+ * Kural 6: Geçmiş yayın verileri asla silinmez.
+ */
+export function generateSmartBroadcastSchedule(
+  startDateStr: string,
+  daysCount: number = 1
+): BroadcastSlot[] {
+  const allGuests = loadGuests();
+  const existingSchedules = loadBroadcastSchedules();
+
+  // Aday Havuzları
+  const paidGuests = allGuests.filter((g) => isGuestPaid(g));
+  const freeGuests = allGuests.filter((g) => !isGuestPaid(g));
+
+  // Yayına hazır olanlar öncelikli havuzdur
+  const readyPaid = paidGuests.filter((g) =>
+    ["edit_done", "review_approved", "publishing"].includes(g.status)
+  );
+  const paidPool = readyPaid.length > 0 ? [...readyPaid, ...paidGuests.filter((g) => !readyPaid.includes(g))] : [...paidGuests];
+
+  const readyFree = freeGuests.filter((g) =>
+    ["edit_done", "review_approved", "publishing"].includes(g.status)
+  );
+  const freePool = readyFree.length > 0 ? [...readyFree, ...freeGuests.filter((g) => !readyFree.includes(g))] : [...freeGuests];
+
+  const archivePool = [...paidGuests];
+
+  let paidCursor = 0;
+  let freeCursor = 0;
+  let archiveCursor = 0;
+
+  const generatedSlots: BroadcastSlot[] = [];
+  const targetDates: string[] = [];
+
+  const baseDate = new Date(startDateStr);
+  for (let d = 0; d < daysCount; d++) {
+    const curDate = new Date(baseDate.getTime() + d * 24 * 60 * 60 * 1000);
+    const dateFormatted = curDate.toISOString().split("T")[0];
+    targetDates.push(dateFormatted);
+  }
+
+  for (const dateStr of targetDates) {
+    for (const timeStr of BROADCAST_DAILY_HOURS) {
+      const isPrime = isSlotPrimeTime(timeStr);
+      let assignedGuest: Guest | null = null;
+      let isPaid = false;
+      let isRepeat = false;
+      let note = "";
+
+      if (isPrime) {
+        // Prime saat (12:00 - 16:00): Yeni ve ücretli konuk
+        if (paidCursor < paidPool.length) {
+          assignedGuest = paidPool[paidCursor];
+          paidCursor++;
+          isPaid = true;
+          isRepeat = false;
+          note = "🔥 Prime Time (Yeni Ücretli Konuk)";
+        } else if (archivePool.length > 0) {
+          // Yeni ücretli bittiyse arşivden ücretli tekrar yayın
+          assignedGuest = archivePool[archiveCursor % archivePool.length];
+          archiveCursor++;
+          isPaid = true;
+          isRepeat = true;
+          note = "🔄 Arşiv Tekrar Yayın (Ücretli Portföy)";
+        }
+      } else {
+        // Standart saat (11:30, 16:30 - 19:00): Ücretsiz konuk
+        if (freeCursor < freePool.length) {
+          assignedGuest = freePool[freeCursor];
+          freeCursor++;
+          isPaid = false;
+          isRepeat = false;
+          note = "📺 Canlı Yayın Kuşağı (Ücretsiz Konuk)";
+        } else if (archivePool.length > 0) {
+          assignedGuest = archivePool[archiveCursor % archivePool.length];
+          archiveCursor++;
+          isPaid = true;
+          isRepeat = true;
+          note = "🔄 Arşiv Kuşağı (Tekrar Yayın)";
+        }
+      }
+
+      const slotId = `slot-${dateStr}-${timeStr.replace(":", "")}`;
+      generatedSlots.push({
+        id: slotId,
+        date: dateStr,
+        time: timeStr,
+        isPrimeTime: isPrime,
+        guestId: assignedGuest?.id,
+        guestName: assignedGuest?.name || "BCT Tanıtım Kuşağı",
+        company: assignedGuest?.company || "BCT Medya Stüdyoları",
+        title: assignedGuest?.title || "Özel Röportaj Yayını",
+        isPaid,
+        isRepeat,
+        customNotes: note,
+        status: "planlandi",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  // Geçmiş takvim verilerini asla silme, korunacakları birleştir
+  const retainedExisting = existingSchedules.filter((s) => !targetDates.includes(s.date));
+  const merged = [...retainedExisting, ...generatedSlots];
+
+  merged.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.time.localeCompare(b.time);
+  });
+
+  saveBroadcastSchedules(merged);
+  return merged;
+}
+
+export function getBroadcastSchedules(): BroadcastSlot[] {
+  const existing = loadBroadcastSchedules();
+  if (existing.length > 0) return existing;
+
+  // Başlangıç için bugünden itibaren 2 günlük varsayılan akıllı takvim oluştur
+  const todayStr = new Date().toISOString().split("T")[0];
+  return generateSmartBroadcastSchedule(todayStr, 2);
+}
+
+export function updateBroadcastSlot(slotId: string, updates: Partial<BroadcastSlot>): boolean {
+  const schedules = loadBroadcastSchedules();
+  const idx = schedules.findIndex((s) => s.id === slotId);
+  if (idx === -1) return false;
+
+  schedules[idx] = {
+    ...schedules[idx],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveBroadcastSchedules(schedules);
+  notify();
+  return true;
+}
+
+export function updateGuestYouTube(guestId: string, metadata: Partial<YouTubeMetadata>): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  guest.youtubeMetadata = {
+    ...(guest.youtubeMetadata || {}),
+    ...metadata,
+    uploadedAt: new Date().toISOString(),
+  };
+
+  saveGuests(guests);
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Yayın Yönetmeni",
+    userRole: getCurrentUser()?.role || "Yayın Masası",
+    action: "YouTube Yayın Bilgisi Güncellendi",
+    target: guest.name,
+    category: "system",
+    details: `YouTube durumu: ${metadata.status || "Güncellendi"}, Video URL: ${metadata.youtubeUrl || "Belirtilmedi"}`,
+  });
+
+  notify();
+  return true;
 }
 
 

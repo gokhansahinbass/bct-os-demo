@@ -19,6 +19,12 @@ import {
   isRealAdminSession,
   exitAdminPreview as storeExitAdminPreview,
   changeStaffPassword,
+  getBroadcastSchedules,
+  generateSmartBroadcastSchedule,
+  updateBroadcastSlot,
+  updateGuestYouTube,
+  getGuestDeadlineInfo,
+  isGuestPaid,
   hasRolePermission,
   canRoleAccessPath,
   canRoleAccessRoom,
@@ -35,6 +41,7 @@ import {
   type Room,
   type RoleDefinition,
   type PasswordChangeResult,
+  type BroadcastSlot,
 } from "@/lib/store";
 import { setupSupabaseAutoSync } from "@/lib/supabase";
 
@@ -49,6 +56,7 @@ export function useStore() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
+  const [broadcastSchedules, setBroadcastSchedules] = useState<BroadcastSlot[]>([]);
   const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
   const [adminOriginUser, setLocalAdminOriginUser] = useState<StaffMember | null>(null);
   const [activeRole, setLocalActiveRole] = useState<string>("admin");
@@ -62,6 +70,7 @@ export function useStore() {
     setAuditLogs(getAuditLogs());
     setRooms(getRooms());
     setRoles(getRoles());
+    setBroadcastSchedules(getBroadcastSchedules());
     setLocalCurrentUser(getCurrentUser());
     setLocalAdminOriginUser(getAdminOriginUser());
     setLocalActiveRole(getActiveRole());
@@ -196,6 +205,12 @@ export function useStore() {
     isInPreviewMode,
     exitAdminPreview,
     changePassword,
+    broadcastSchedules,
+    generateSmartBroadcastSchedule,
+    updateBroadcastSlot,
+    updateGuestYouTube,
+    getGuestDeadlineInfo,
+    isGuestPaid,
     hasPermission,
     canAccessPage,
     canAccessRoom,
