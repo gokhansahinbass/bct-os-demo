@@ -12,6 +12,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [authorized, setAuthorized] = useState(false);
   const { canAccessPage, activeRole, activeRoleDef } = useStore();
 
+  const [isOnline, setIsOnline] = useState(true);
+  const [showReconnected, setShowReconnected] = useState(false);
+
   useEffect(() => {
     // Cookie kontrolü — giriş yapılmış mı?
     const hasAuth = document.cookie.split(";").some((c) => c.trim().startsWith("bct_auth=granted"));
@@ -19,6 +22,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace("/login");
     } else {
       setAuthorized(true);
+    }
+
+    // Çevrimiçi / Çevrimdışı Bağlantı Durumu İzleme
+    if (typeof window !== "undefined") {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => {
+        setIsOnline(true);
+        setShowReconnected(true);
+        setTimeout(() => setShowReconnected(false), 4000);
+      };
+      const handleOffline = () => {
+        setIsOnline(false);
+      };
+
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
     }
   }, [router]);
 
@@ -47,6 +70,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
         <Header />
+
+        {/* ── Offline-First Bilgilendirme Banner'ı ── */}
+        {!isOnline && (
+          <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between shadow-xs z-20 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="animate-pulse">⚠️</span>
+              <span>
+                <strong>Çevrimdışı Mod (Offline-First):</strong> İnternet bağlantınız koptu. Tüm değişiklikler yerel olarak güvenle saklanmaktadır. Bağlantı geldiğinde bulut ile otomatik eşitlenecektir.
+              </span>
+            </div>
+            <span className="text-[10px] font-mono bg-amber-700/90 px-2 py-0.5 rounded">YEREL DEPOLAMA DEVREDE</span>
+          </div>
+        )}
+
+        {showReconnected && (
+          <div className="bg-emerald-600 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between shadow-xs z-20 shrink-0">
+            <div className="flex items-center gap-2">
+              <span>✓</span>
+              <span>
+                <strong>Bağlantı Kuruldu:</strong> İnternet erişimi yeniden sağlandı. Veriler Supabase bulut veritabanı ile canlı eşitleniyor.
+              </span>
+            </div>
+            <span className="text-[10px] font-mono bg-emerald-700/90 px-2 py-0.5 rounded">CANLI BULUT SENKRON</span>
+          </div>
+        )}
+
         <main className="flex-1 bg-[#F8FAFC] p-8 overflow-y-auto">
           {!isAllowed ? (
             <div className="h-full min-h-[500px] flex items-center justify-center p-4">
