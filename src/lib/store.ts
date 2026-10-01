@@ -2549,9 +2549,21 @@ export function setAdminOriginUser(user: StaffMember | null) {
 /**
  * Oturumun gerçekte bir Süper Admin tarafından açılıp açılmadığını veya
  * şu an bir Admin'in başka bir rolü test/önizleme edip etmediğini kontrol eder.
+ * Güvenlik Katmanı: Hem tarayıcıdaki bct_admin_session çerezini hem de admin kimliğini zorunlu kılar.
  */
 export function isRealAdminSession(): boolean {
   if (typeof window === "undefined") return false;
+
+  // 1. Tarayıcı / HTTP güvenlik çerezi doğrulaması: bct_admin_session=active var mı?
+  const hasAdminCookie = document.cookie
+    .split(";")
+    .some((c) => c.trim().startsWith("bct_admin_session=active"));
+
+  if (!hasAdminCookie) {
+    return false;
+  }
+
+  // 2. Admin kimlik veya önizleme doğrulaması
   const origin = getAdminOriginUser();
   if (origin && (origin.role === "Süper Admin" || origin.id === "usr-gokhan" || origin.username === "gokhan")) {
     return true;

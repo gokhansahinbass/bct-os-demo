@@ -84,9 +84,21 @@ export default function LoginPage() {
           }
         }
 
+        const isRealSuperAdmin =
+          Boolean(isMasterAdmin) ||
+          activeStaff.role === "Süper Admin" ||
+          activeStaff.username === "gokhan" ||
+          activeStaff.id === "usr-gokhan";
+
         // Cookie & Session Yaz
         document.cookie = "bct_auth=granted; path=/; max-age=28800; SameSite=Lax";
-        setAdminOriginUser(null);
+        if (isRealSuperAdmin) {
+          document.cookie = "bct_admin_session=active; path=/; max-age=28800; SameSite=Lax";
+        } else {
+          document.cookie = "bct_admin_session=; path=/; max-age=0; SameSite=Lax";
+          setAdminOriginUser(null);
+        }
+
         setCurrentUser(activeStaff);
         setActiveRole(roleKey);
 

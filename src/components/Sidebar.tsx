@@ -224,6 +224,7 @@ export default function Sidebar() {
               onClick={() => {
                 exitAdminPreview();
                 document.cookie = "bct_auth=; path=/; max-age=0";
+                document.cookie = "bct_admin_session=; path=/; max-age=0";
                 window.location.href = "/login";
               }}
             >

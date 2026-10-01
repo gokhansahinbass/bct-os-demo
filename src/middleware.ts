@@ -4,7 +4,9 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const authCookie = request.cookies.get("bct_auth")?.value;
+  const adminCookie = request.cookies.get("bct_admin_session")?.value;
   const isAuthenticated = authCookie === "granted";
+  const isSuperAdmin = adminCookie === "active";
 
   // 1. Dashboard sayfalarına yetkisiz erişim kontrolü (Sunucu Düzeyinde Koruma)
   if (pathname.startsWith("/dashboard")) {
@@ -12,6 +14,15 @@ export function middleware(request: NextRequest) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
+    }
+
+    // 1b. /dashboard/admin rotasını doğrudan sunucu düzeyinde koru
+    // Normal bir çalışan URL çubuğundan doğrudan /dashboard/admin yazsa bile
+    // Sunucu bu isteği anında yakalar ve personeli yetkili sayfasına yönlendirir.
+    if (pathname.startsWith("/dashboard/admin")) {
+      if (!isSuperAdmin) {
+        return NextResponse.redirect(new URL("/dashboard/cagri-merkezi", request.url));
+      }
     }
   }
 
