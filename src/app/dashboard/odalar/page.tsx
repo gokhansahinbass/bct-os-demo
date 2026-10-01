@@ -11,6 +11,8 @@ import {
   type Guest,
   type GuestStatus,
 } from "@/lib/store";
+import StudioDelayBanner from "@/components/StudioDelayBanner";
+import UpdateTimeModal from "@/components/UpdateTimeModal";
 
 export default function OdalarPage() {
   const {
@@ -25,7 +27,12 @@ export default function OdalarPage() {
     activeRoleDef,
     hasPermission,
     canManageGuest,
+    studioDelays,
+    sendGuestArrivalReminder,
   } = useStore();
+
+  const [updateTimeModalGuest, setUpdateTimeModalGuest] = useState<Guest | null>(null);
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
   if (!canAccessPage("/dashboard/odalar")) {
     return null;
@@ -792,10 +799,46 @@ export default function OdalarPage() {
 
                           {/* Randevu & Çekim Saati */}
                           <td className="p-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono font-bold text-slate-900 text-xs">
-                                ⏰ {g.appointmentTime}
-                              </span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-slate-900 text-xs">
+                                  ⏰ {g.appointmentTime}
+                                </span>
+                                {studioDelays[g.studio]?.active && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Stüdyoda çekim sarkması var">
+                                    ⚠️ +{studioDelays[g.studio].delayMinutes} dk sarktı
+                                  </span>
+                                )}
+                              </div>
+
+                              {g.timeStatus === "gecikmeli" && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 w-fit">
+                                  <span>⏳ Geç Gelecek</span>
+                                  {g.timeUpdateReason && (
+                                    <span className="text-[9px] text-amber-800 italic max-w-[130px] truncate" title={g.timeUpdateReason}>
+                                      • {g.timeUpdateReason}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+
+                              {g.timeStatus === "erken_geldi" && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300 w-fit">
+                                  <span>⚡ Erken Geldi</span>
+                                </span>
+                              )}
+
+                              {category === "upcoming" && (!g.timeStatus || g.timeStatus === "normal") && (
+                                g.timeConfirmed ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+                                    <span>✓</span> Vaktinde Geliyor
+                                  </span>
+                                ) : g.representativeRemindedAt ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
+                                    <span>⚠️</span> Teyit Bekleniyor
+                                  </span>
+                                ) : null
+                              )}
                             </div>
                           </td>
 
@@ -871,6 +914,30 @@ export default function OdalarPage() {
                                       {category === "upcoming" && (
                                         <>
                                           <button
+                                            onClick={() => setUpdateTimeModalGuest(g)}
+                                            className="px-2 py-1 text-xs font-semibold rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer transition flex items-center gap-1 shadow-2xs"
+                                            title="Konuğun randevu saatini veya gecikme/erken geliş beyanını güncelle"
+                                          >
+                                            <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                            <span>Saat</span>
+                                          </button>
+
+                                          {!g.timeConfirmed && (
+                                            <button
+                                              onClick={() => {
+                                                sendGuestArrivalReminder(g.id);
+                                                setFeedbackToast(`🔔 ${g.representative} adlı temsilciye "${g.name}" için acil teyit hatırlatması iletildi.`);
+                                                setTimeout(() => setFeedbackToast(null), 4000);
+                                              }}
+                                              className="px-2 py-1 text-xs font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer transition flex items-center gap-1 shadow-2xs"
+                                              title="Davet eden temsilciye konuğu arayıp teyit etmesi için bildirim gönder"
+                                            >
+                                              <span className="material-symbols-outlined text-[13px] text-amber-600">notifications_active</span>
+                                              <span>Teyit</span>
+                                            </button>
+                                          )}
+
+                                          <button
                                             onClick={() => handleMarkArrived(g, roomDef.leaderName)}
                                             className="px-2 py-1 text-xs font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer transition shadow-2xs"
                                             title="Konuk Geldi, Çekime Al (Yetkili: Siz)"
@@ -882,7 +949,7 @@ export default function OdalarPage() {
                                             className="px-2 py-1 text-xs font-semibold rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer transition"
                                             title="Randevuyu İptal Et (Yetkili: Siz)"
                                           >
-                                            İptal Et
+                                            İptal
                                           </button>
                                         </>
                                       )}
@@ -981,6 +1048,17 @@ export default function OdalarPage() {
         {/* ══════════════════════════════════════════════════════════ */}
         {mainTab === "rooms" && (
           <div className="space-y-6">
+            {/* Feedback Toast */}
+            {feedbackToast && (
+              <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl text-xs font-semibold animate-fadeIn">
+                <span className="material-symbols-outlined text-amber-400 text-[20px]">notifications_active</span>
+                <span>{feedbackToast}</span>
+              </div>
+            )}
+
+            {/* ── STÜDYO ÇEKİM SARKMASI UYARI BANNER'I ── */}
+            <StudioDelayBanner />
+
             {/* Bilgilendirme Notu */}
             <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <p>
@@ -1767,6 +1845,19 @@ export default function OdalarPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── Konuk Randevu Saati & Beyan Güncelleme Modalı ── */}
+      {updateTimeModalGuest && (
+        <UpdateTimeModal
+          isOpen={Boolean(updateTimeModalGuest)}
+          guest={updateTimeModalGuest}
+          onClose={() => setUpdateTimeModalGuest(null)}
+          onSuccess={(msg) => {
+            setFeedbackToast(msg);
+            setTimeout(() => setFeedbackToast(null), 4000);
+          }}
+        />
       )}
     </div>
   );

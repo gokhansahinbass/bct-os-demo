@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useStore } from "@/lib/useStore";
 import {
   markNotificationRead,
@@ -30,7 +30,29 @@ export default function Header() {
   } = useStore();
 
   const [showNotifs, setShowNotifs] = useState(false);
+  const [notifTab, setNotifTab] = useState<"targeted" | "all">("targeted");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // ── Hedefli Bildirim Filtreleme (Bana / Birimime Özel) ──
+  const targetedNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      if (n.to === "all") return true;
+      if (currentUser?.id && n.to === currentUser.id) return true;
+      if (currentUser?.name && n.to.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      if (activeRole && n.to.toLowerCase() === activeRole.toLowerCase()) return true;
+      if (activeRole === "cagri_sefi" && n.to === "cagri_sefi") return true;
+      if (activeRole === "cagri_temsilci" && currentUser?.name && n.to.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      if (activeRole === "admin") return true;
+      return false;
+    });
+  }, [notifications, currentUser, activeRole]);
+
+  const myUnreadCount = useMemo(() => {
+    return targetedNotifications.filter((n) => !n.read).length;
+  }, [targetedNotifications]);
+
+  const displayedNotifications = notifTab === "targeted" ? targetedNotifications : notifications;
+  const displayedUnreadCount = displayedNotifications.filter((n) => !n.read).length;
 
   function handleRoleChange(newRole: string) {
     if (newRole === "admin") {
@@ -74,18 +96,35 @@ export default function Header() {
 
   function getIcon(type: string) {
     switch (type) {
+      case "guest_arrived": return "how_to_reg";
       case "task": return "assignment";
       case "warning": return "warning";
-      default: return "info";
+      case "success": return "check_circle";
+      default: return "notifications";
     }
   }
 
   function getIconColor(type: string) {
     switch (type) {
-      case "task": return "text-blue-600";
+      case "guest_arrived": return "text-blue-600";
+      case "task": return "text-purple-600";
       case "warning": return "text-amber-600";
+      case "success": return "text-emerald-600";
       default: return "text-slate-500";
     }
+  }
+
+  function getRecipientBadge(to: string) {
+    if (to === "all") return "Tüm Sistem";
+    if (to === "reji") return "Reji Ekibi";
+    if (to === "pazarlama") return "Pazarlama";
+    if (to === "kurgu") return "Kurgu & Montaj";
+    if (to === "izleme") return "İzleme Masası";
+    if (to === "yayin") return "Yayın Masası";
+    if (to === "cagri_sefi") return "Çağrı Şefleri";
+    if (to === "dergi_tasarimci") return "Dergi Ekibi";
+    if (to === "ek_hizmetler") return "Ek Hizmetler";
+    return `Kişiye Özel: ${to}`;
   }
 
   function timeAgo(dateStr: string) {
@@ -243,11 +282,15 @@ export default function Header() {
             title="Bildirimler"
           >
             <span className="material-symbols-outlined text-[20px]">notifications</span>
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
+            {myUnreadCount > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white animate-pulse">
+                {myUnreadCount}
+              </span>
+            ) : unreadCount > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-slate-400 text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
                 {unreadCount}
               </span>
-            )}
+            ) : null}
           </button>
 
           {/* Notification Dropdown */}
@@ -256,14 +299,14 @@ export default function Header() {
               {/* Backdrop */}
               <div className="fixed inset-0 z-40" onClick={() => setShowNotifs(false)}></div>
 
-              <div className="absolute right-0 top-12 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-12 w-[420px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
                 {/* Dropdown Header */}
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-[#0F172A]">Bildirimler</span>
-                    {unreadCount > 0 && (
+                    <span className="text-sm font-semibold text-[#0F172A]">Bildirim Merkezi</span>
+                    {displayedUnreadCount > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-100 text-red-700 font-semibold">
-                        {unreadCount} yeni
+                        {displayedUnreadCount} yeni
                       </span>
                     )}
                   </div>
@@ -277,18 +320,49 @@ export default function Header() {
                   )}
                 </div>
 
+                {/* Filter Tabs: Bana Özel vs Tüm Sistem */}
+                <div className="flex border-b border-slate-200 bg-slate-100/70 p-1 gap-1">
+                  <button
+                    onClick={() => setNotifTab("targeted")}
+                    className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      notifTab === "targeted"
+                        ? "bg-white text-blue-700 shadow-xs border border-slate-200/80"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>🎯 Bana / Birimime Özel</span>
+                    {myUnreadCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+                        {myUnreadCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setNotifTab("all")}
+                    className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      notifTab === "all"
+                        ? "bg-white text-blue-700 shadow-xs border border-slate-200/80"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>🌐 Tüm Sistem Akışı</span>
+                    <span className="text-[10px] text-slate-400">({notifications.length})</span>
+                  </button>
+                </div>
+
                 {/* Notification List */}
-                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-sm text-slate-400">
-                      Bildirim bulunmuyor
+                <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                  {displayedNotifications.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-slate-400 flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined text-3xl text-slate-300">notifications_off</span>
+                      <span>Bu sekmede bildirim bulunmuyor</span>
                     </div>
                   ) : (
-                    notifications.slice(0, 10).map((n) => (
+                    displayedNotifications.slice(0, 15).map((n) => (
                       <div
                         key={n.id}
                         className={`px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer group ${
-                          !n.read ? "bg-blue-50/30" : ""
+                          !n.read ? "bg-blue-50/40" : ""
                         }`}
                         onClick={() => {
                           markNotificationRead(n.id);
@@ -301,18 +375,22 @@ export default function Header() {
                           {getIcon(n.type)}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-[#0F172A] truncate">{n.title}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-[#0F172A] truncate">{n.title}</span>
                             {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>}
+                            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              {getRecipientBadge(n.to)}
+                            </span>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
-                          <span className="text-[11px] text-slate-400 mt-1 block">{timeAgo(n.createdAt)}</span>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{n.message}</p>
+                          <span className="text-[10px] text-slate-400 mt-1 block font-mono">{timeAgo(n.createdAt)}</span>
                         </div>
                         {n.link && (
                           <Link
                             href={n.link}
                             onClick={() => setShowNotifs(false)}
-                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-800"
+                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-800 self-center p-1"
+                            title="Sayfaya Git"
                           >
                             <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                           </Link>
@@ -322,7 +400,7 @@ export default function Header() {
                             e.stopPropagation();
                             deleteNotification(n.id);
                           }}
-                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600"
+                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 self-start p-1"
                           title="Sil"
                         >
                           <span className="material-symbols-outlined text-[14px]">close</span>

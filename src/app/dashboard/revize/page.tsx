@@ -103,7 +103,7 @@ export default function RevizePage() {
     }
 
     addNotification({
-      to: "usr-gokhan",
+      to: "kurgu",
       from: newNoteAuthor,
       type: "task",
       title: `Yeni Revize: ${activeGuest.name}`,
@@ -122,7 +122,7 @@ export default function RevizePage() {
     if (!activeGuest) return;
     updateGuestStatus(activeGuest.id, "editing");
     addNotification({
-      to: "usr-gokhan",
+      to: "kurgu",
       from: "Revize Masası",
       type: "task",
       title: `Revize Sevk Edildi: ${activeGuest.name}`,
@@ -137,11 +137,19 @@ export default function RevizePage() {
     if (!activeGuest) return;
     updateGuestStatus(activeGuest.id, "reviewing");
     addNotification({
-      to: "all",
+      to: "izleme",
       from: "Revize Masası",
       type: "info",
       title: `Revize Bitti, İzlemeye Gönderildi: ${activeGuest.name}`,
       message: `Tüm revizeler tamamlandı olarak işaretlendi ve izleme onayına sunuldu.`,
+      link: "/dashboard/izleme",
+    });
+    addNotification({
+      to: "all",
+      from: "Revize Masası",
+      type: "info",
+      title: `Revize Tamamlandı: ${activeGuest.name}`,
+      message: `Tüm revizeler tamamlandı ve video izleme onayına gönderildi.`,
       link: "/dashboard/izleme",
     });
     setFeedback(`✓ ${activeGuest.name} videosu onay için İzleme Masasına gönderildi.`);

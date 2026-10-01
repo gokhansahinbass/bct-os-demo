@@ -74,14 +74,39 @@ export default function IzlemePage() {
 
     setTimeout(() => {
       updateGuestStatus(activeGuest.id, "review_approved");
+      
+      // Yayın masasına bildirim
       addNotification({
-        to: "all",
-        from: "system",
-        type: "info",
-        title: "İzleme Onayı",
-        message: `${activeGuest.name} videosu onaylandı ve dijital kart masasına sevk edildi.`,
+        to: "yayin",
+        from: "izleme",
+        type: "task",
+        title: `📺 Yayına Hazır: ${activeGuest.name}`,
+        message: `${activeGuest.name} (${activeGuest.company}) videosu onaylandı. Yayın akışı ve dijital kart için hazır.`,
         link: "/dashboard/yayin",
       });
+
+      // Temsilciye müjde
+      if (activeGuest.representative) {
+        addNotification({
+          to: activeGuest.representative,
+          from: "izleme",
+          type: "success",
+          title: `✅ Video Onaylandı: ${activeGuest.name}`,
+          message: `Konuğunuz ${activeGuest.name}'ın videosu kalite kontrolünden tam not aldı ve yayın sırasına alındı.`,
+          link: "/dashboard/odalar",
+        });
+      }
+
+      // Genel duyuru
+      addNotification({
+        to: "all",
+        from: "izleme",
+        type: "info",
+        title: "İzleme Onayı",
+        message: `${activeGuest.name} videosu onaylandı ve dijital kart & yayın masasına sevk edildi.`,
+        link: "/dashboard/yayin",
+      });
+
       setApproveState("done");
       setFeedback(`✓ ${activeGuest.name} videosu onaylandı ve Dijital Kart & Yayın masasına sevk edildi.`);
       setTimeout(() => {
@@ -94,14 +119,39 @@ export default function IzlemePage() {
   function handleSendBack() {
     if (!activeGuest) return;
     updateGuestStatus(activeGuest.id, "editing");
+
+    // Kurgu ekibine ve editöre bildirim
     addNotification({
-      to: "usr-gokhan",
-      from: "system",
+      to: "kurgu",
+      from: "izleme",
       type: "task",
-      title: "Revize Talebi",
-      message: `${activeGuest.name} videosu revize için kurgu masasına geri gönderildi.`,
+      title: `⚠️ Revize Talebi: ${activeGuest.name}`,
+      message: `${activeGuest.name} videosu izleme masasından revize notlarıyla kurguya geri yönlendirildi.`,
       link: "/dashboard/montaj",
     });
+
+    if (activeGuest.editor) {
+      addNotification({
+        to: activeGuest.editor,
+        from: "izleme",
+        type: "task",
+        title: `⚠️ Revize Notu: ${activeGuest.name}`,
+        message: `Kurguladığınız ${activeGuest.name} videosu için revize talebi var.`,
+        link: "/dashboard/montaj",
+      });
+    }
+
+    if (activeGuest.representative) {
+      addNotification({
+        to: activeGuest.representative,
+        from: "izleme",
+        type: "warning",
+        title: `📝 Revize Talebi: ${activeGuest.name}`,
+        message: `Konuğunuz ${activeGuest.name}'ın videosu için revize talebinde bulunuldu, kurgucu ilgileniyor.`,
+        link: "/dashboard/revize",
+      });
+    }
+
     setFeedback(`↩ ${activeGuest.name} videosu revize için kurgu masasına geri gönderildi.`);
     setTimeout(() => setFeedback(null), 4000);
   }

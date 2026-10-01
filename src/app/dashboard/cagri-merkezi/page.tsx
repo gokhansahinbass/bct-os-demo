@@ -10,9 +10,20 @@ import {
   type GuestStatus,
   type Guest,
 } from "@/lib/store";
+import StudioDelayBanner from "@/components/StudioDelayBanner";
+import UpdateTimeModal from "@/components/UpdateTimeModal";
 
 export default function CagriMerkeziPage() {
-  const { guests, staff, canAccessPage, isSensitiveBlurred, activeRoleDef, canManageGuest } = useStore();
+  const {
+    guests,
+    staff,
+    canAccessPage,
+    isSensitiveBlurred,
+    activeRoleDef,
+    canManageGuest,
+    studioDelays,
+    sendGuestArrivalReminder,
+  } = useStore();
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [guestName, setGuestName] = useState("");
@@ -26,6 +37,7 @@ export default function CagriMerkeziPage() {
   // Modals
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [updateTimeGuest, setUpdateTimeGuest] = useState<Guest | null>(null);
 
   function handleNewAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -283,6 +295,11 @@ export default function CagriMerkeziPage() {
             <span className="text-xs font-mono font-medium text-slate-600">Bugün: {guests.length} Konuk</span>
           </div>
         </div>
+      </div>
+
+      {/* ── STÜDYO SARKMA / GECİKME UYARI BANNER'I ── */}
+      <div className="mt-4">
+        <StudioDelayBanner />
       </div>
 
       {/* TOP METRICS & LEADERBOARD */}
@@ -555,6 +572,31 @@ export default function CagriMerkeziPage() {
                             )}
                           </div>
                           <p className="text-[11px] text-slate-500">{g.company} — <strong className="text-slate-700">{g.title}</strong></p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                              ⏰ {g.appointmentTime}
+                            </span>
+                            {studioDelays[g.studio]?.active && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                ⚠️ +{studioDelays[g.studio].delayMinutes} dk sarktı
+                              </span>
+                            )}
+                            {g.timeStatus === "gecikmeli" && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                ⏳ Geç Gelecek {g.timeUpdateReason ? `(${g.timeUpdateReason})` : ""}
+                              </span>
+                            )}
+                            {g.timeStatus === "erken_geldi" && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
+                                ⚡ Erken Geldi
+                              </span>
+                            )}
+                            {g.status === "appointment_set" && !g.timeStatus && g.representativeRemindedAt && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                ⚠️ Teyit Bekleniyor
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -637,13 +679,38 @@ export default function CagriMerkeziPage() {
                           return (
                             <>
                               {["appointment_set", "kiosk_registered"].includes(g.status) && (
-                                <button
-                                  onClick={() => handleAdvanceToStudio(g)}
-                                  className="px-2 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer"
-                                  title="Konuğu Stüdyoya Al (Yetkili: Siz)"
-                                >
-                                  Stüdyoya Al
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => setUpdateTimeGuest(g)}
+                                    className="px-2 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer flex items-center gap-1"
+                                    title="Konuğun randevu saatini veya gecikme beyanını güncelle"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                    <span>Saat</span>
+                                  </button>
+                                  {g.status === "appointment_set" && !g.timeConfirmed && (
+                                    <button
+                                      onClick={() => {
+                                        sendGuestArrivalReminder(g.id);
+                                        setFeedbackMsg(`🔔 ${g.representative} adlı temsilciye "${g.name}" için acil teyit hatırlatması iletildi.`);
+                                        setFeedbackVisible(true);
+                                        setTimeout(() => setFeedbackVisible(false), 4000);
+                                      }}
+                                      className="px-2 py-1 text-xs font-medium rounded bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 cursor-pointer flex items-center gap-1"
+                                      title="Temsilciye teyit çağrısı ilet"
+                                    >
+                                      <span className="material-symbols-outlined text-[13px] text-amber-600">notifications_active</span>
+                                      <span>Teyit</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleAdvanceToStudio(g)}
+                                    className="px-2 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer font-bold"
+                                    title="Konuğu Stüdyoya Al (Yetkili: Siz)"
+                                  >
+                                    Stüdyoya Al
+                                  </button>
+                                </>
                               )}
                               {g.status === "in_studio" && (
                                 <button
@@ -1048,6 +1115,18 @@ export default function CagriMerkeziPage() {
           </div>
         );
       })()}
+
+      {/* SAAT / BEYAN GÜNCELLEME MODALI */}
+      <UpdateTimeModal
+        isOpen={Boolean(updateTimeGuest)}
+        guest={updateTimeGuest}
+        onClose={() => setUpdateTimeGuest(null)}
+        onSuccess={(msg) => {
+          setFeedbackMsg(msg);
+          setFeedbackVisible(true);
+          setTimeout(() => setFeedbackVisible(false), 4000);
+        }}
+      />
     </div>
   );
 }

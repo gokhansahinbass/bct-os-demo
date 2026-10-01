@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { updateGuest, getGuestDeadlineInfo, type Guest } from "@/lib/store";
+import { updateGuest, getGuestDeadlineInfo, addNotification, type Guest } from "@/lib/store";
 
 export default function MontajPage() {
   const { guests, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
@@ -57,6 +57,17 @@ export default function MontajPage() {
       editor: "Gökhan",
     });
 
+    if (g.representative) {
+      addNotification({
+        to: g.representative,
+        from: "kurgu",
+        type: "info",
+        title: `🎬 Kurgu Başladı: ${g.name}`,
+        message: `Konuğunuz ${g.name} videosunun kurgusuna Gökhan tarafından başlandı.`,
+        link: "/dashboard/montaj",
+      });
+    }
+
     showToast(`${g.name} kurgusu üzerinize alındı ve kilitlendi.`);
   }
 
@@ -67,6 +78,28 @@ export default function MontajPage() {
     updateGuest(guestId, {
       status: "edit_done",
     });
+
+    // İzleme Masasına Bildirim
+    addNotification({
+      to: "izleme",
+      from: "kurgu",
+      type: "task",
+      title: `🎬 Kurgu Tamamlandı: ${g.name}`,
+      message: `${g.name} (${g.company}) videosunun montajı bitti. İzleme onayına hazır.`,
+      link: "/dashboard/izleme",
+    });
+
+    // Temsilciye Bildirim
+    if (g.representative) {
+      addNotification({
+        to: g.representative,
+        from: "kurgu",
+        type: "info",
+        title: `✂️ Montaj Bitti: ${g.name}`,
+        message: `Konuğunuz ${g.name} videosunun kurgusu bitti ve kalite kontrol (izleme) masasına devredildi.`,
+        link: "/dashboard/odalar",
+      });
+    }
 
     showToast(`${g.name} kurgusu tamamlandı, İzleme Masası'na aktarıldı.`);
   }

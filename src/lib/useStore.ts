@@ -26,6 +26,13 @@ import {
   sendStudioReadyCall,
   assignGuestToStudio,
   completeStudioShoot,
+  getStudioDelays,
+  sendStudioDelayAlert,
+  clearStudioDelay,
+  updateGuestAppointmentTime,
+  confirmGuestAppointment,
+  sendGuestArrivalReminder,
+  checkUpcomingAppointmentReminders,
   getGuestDeadlineInfo,
   isGuestPaid,
   hasRolePermission,
@@ -38,6 +45,8 @@ import {
   applyRemoteStaff,
   type Guest,
   type GuestStatus,
+  type GuestTimeStatus,
+  type StudioDelay,
   type StaffMember,
   type Notification,
   type AuditLog,
@@ -60,6 +69,7 @@ export function useStore() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [broadcastSchedules, setBroadcastSchedules] = useState<BroadcastSlot[]>([]);
+  const [studioDelays, setStudioDelays] = useState<Record<string, StudioDelay>>({});
   const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
   const [adminOriginUser, setLocalAdminOriginUser] = useState<StaffMember | null>(null);
   const [activeRole, setLocalActiveRole] = useState<string>("admin");
@@ -74,6 +84,7 @@ export function useStore() {
     setRooms(getRooms());
     setRoles(getRoles());
     setBroadcastSchedules(getBroadcastSchedules());
+    setStudioDelays(getStudioDelays());
     setLocalCurrentUser(getCurrentUser());
     setLocalAdminOriginUser(getAdminOriginUser());
     setLocalActiveRole(getActiveRole());
@@ -84,6 +95,17 @@ export function useStore() {
   useEffect(() => {
     refresh();
     const unsub = subscribe(refresh);
+
+    // Yaklaşan randevuları otomatik denetle (gelmesine kısa süre kalan ve saatini güncellemeyenler için teyit uyarısı)
+    try {
+      checkUpcomingAppointmentReminders();
+    } catch {}
+
+    const intervalTimer = setInterval(() => {
+      try {
+        checkUpcomingAppointmentReminders();
+      } catch {}
+    }, 45000);
 
     // Supabase arka plan otomatik başlatma, boşsa otomatik tohumlama (Auto-seed)
     // ve canlı veritabanı değişikliklerini anlık dinleme (Realtime)
@@ -104,6 +126,7 @@ export function useStore() {
 
     return () => {
       unsub();
+      clearInterval(intervalTimer);
     };
   }, [refresh]);
 
@@ -212,6 +235,14 @@ export function useStore() {
     generateSmartBroadcastSchedule,
     updateBroadcastSlot,
     updateGuestYouTube,
+    studioDelays,
+    sendStudioDelayAlert,
+    clearStudioDelay,
+    getStudioDelays,
+    updateGuestAppointmentTime,
+    confirmGuestAppointment,
+    sendGuestArrivalReminder,
+    checkUpcomingAppointmentReminders,
     sendStudioReadyCall,
     assignGuestToStudio,
     completeStudioShoot,

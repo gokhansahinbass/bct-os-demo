@@ -7,10 +7,12 @@ import {
   updateGuest,
   addServiceToGuest,
   removeServiceFromGuest,
+  addNotification,
   type ServiceType,
   type ServiceDetail,
   type Service,
 } from "@/lib/store";
+import StudioDelayBanner from "@/components/StudioDelayBanner";
 
 const SERVICE_TEMPLATES: {
   type: ServiceType;
@@ -190,7 +192,65 @@ export default function PazarlamaPage() {
       status: "package_set",
     });
 
-    setFeedback(`✓ ${activeGuest.name} paketi ve ödeme bilgisi kaydedildi, montaj kuyruğuna aktarıldı!`);
+    // 1) Kurgu / Montaj Ekibine Bildirim
+    addNotification({
+      to: "kurgu",
+      from: "pazarlama",
+      type: "task",
+      title: `🎬 Paket Tanımlandı: ${activeGuest.name}`,
+      message: `${activeGuest.name} (${activeGuest.company}) için ${activeGuest.services.length} adet hizmet tanımlandı (${totalPrice.toLocaleString("tr-TR")} TL). Montaj kuyruğunda kurguya hazır.`,
+      link: "/dashboard/montaj",
+    });
+
+    // 2) Temsilciye Satış Başarısı Bildirimi
+    if (activeGuest.representative) {
+      addNotification({
+        to: activeGuest.representative,
+        from: "pazarlama",
+        type: "success",
+        title: `🎉 Tebrikler! Satış Kaydedildi: ${activeGuest.name}`,
+        message: `Davet ettiğiniz konuğunuz ${activeGuest.name} için ${totalPrice.toLocaleString("tr-TR")} TL değerinde paket satışı tamamlandı.`,
+        link: "/dashboard/odalar",
+      });
+    }
+
+    // 3) Basılı Dergi Ekibine Bildirim (Eğer dergi hizmeti varsa)
+    const hasDergi = activeGuest.services.some((s) => s.type === "dergi");
+    if (hasDergi) {
+      addNotification({
+        to: "dergi_tasarimci",
+        from: "pazarlama",
+        type: "task",
+        title: `📖 Dergi Sayfa Siparişi: ${activeGuest.name}`,
+        message: `${activeGuest.name} (${activeGuest.company}) için basılı dergi röportaj sayfası siparişi oluşturuldu.`,
+        link: "/dashboard/yonetim",
+      });
+    }
+
+    // 4) Ek Hizmetler / Basın Dağıtım Ekibine Bildirim
+    const hasEkHizmet = activeGuest.services.some((s) => s.type === "haber_sitesi" || s.type === "sosyal_medya");
+    if (hasEkHizmet) {
+      addNotification({
+        to: "ek_hizmetler",
+        from: "pazarlama",
+        type: "task",
+        title: `🌐 Dijital Dağıtım Siparişi: ${activeGuest.name}`,
+        message: `${activeGuest.name} için haber sitesi / sosyal medya dijital dağıtım kaydı işleme alındı.`,
+        link: "/dashboard/yonetim",
+      });
+    }
+
+    // 5) Yönetim ve Genel Sistem
+    addNotification({
+      to: "yonetim",
+      from: "pazarlama",
+      type: "info",
+      title: `💼 Yeni Satış Sözleşmesi: ${activeGuest.name}`,
+      message: `${activeGuest.company} - ${totalPrice.toLocaleString("tr-TR")} TL (${paymentStatus === "on_odeme" ? `Ön Ödeme: ${onOdemeMiktari.toLocaleString("tr-TR")} TL` : paymentStatus}) onaylandı.`,
+      link: "/dashboard/yonetim",
+    });
+
+    setFeedback(`✓ ${activeGuest.name} paketi ve ödeme bilgisi kaydedildi, montaj ve ilgili birimlere bildirim gönderildi!`);
     setTimeout(() => setFeedback(null), 4000);
   }
 
@@ -243,6 +303,11 @@ export default function PazarlamaPage() {
             ★ Canlı Yayın Tüm Konuklar İçin Ücretsizdir
           </span>
         </div>
+      </div>
+
+      {/* ── STÜDYO SARKMA / GECİKME UYARI BANNER'I ── */}
+      <div className="mt-4">
+        <StudioDelayBanner />
       </div>
 
       {feedback && (

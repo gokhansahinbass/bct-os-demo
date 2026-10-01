@@ -7,6 +7,7 @@ import {
   updateGuestStatus,
   isSlotPrimeTime,
   BROADCAST_DAILY_HOURS,
+  addNotification,
   type BroadcastSlot,
   type Guest,
   type YouTubeMetadata,
@@ -133,11 +134,33 @@ export default function YayinPage() {
         ? "⭐ VIP Ücretli Konuk (Canlı Yayın & YouTube)"
         : "📺 Canlı Yayın Kuşağı (Ücretsiz Konuk)",
     });
+
+    if (g.representative) {
+      addNotification({
+        to: g.representative,
+        from: "yayin",
+        type: "info",
+        title: `📺 Canlı Yayın Kuşağı Belirlendi: ${g.name}`,
+        message: `Konuğunuz ${g.name} (${g.company}) için canlı yayın akışı planlandı.`,
+        link: "/dashboard/yayin",
+      });
+    }
+
     showToast(`${g.name} (${g.company}) kuşağa atandı.`);
   }
 
   function handleSlotStatusChange(slotId: string, status: BroadcastSlot["status"]) {
     updateBroadcastSlot(slotId, { status });
+    if (status === "canli_yayinda") {
+      addNotification({
+        to: "all",
+        from: "yayin",
+        type: "info",
+        title: "🔴 Canlı Yayın Başladı",
+        message: `BCT Medya TV canlı yayın kuşağı yayında.`,
+        link: "/dashboard/yayin",
+      });
+    }
     showToast(`Kuşak durumu "${status}" olarak güncellendi.`);
   }
 

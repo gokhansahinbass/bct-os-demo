@@ -81,9 +81,9 @@ export interface SocialMedia {
 
 export interface Notification {
   id: string;
-  to: string;        // staff ID, role key ("pazarlama", "kurgu", "admin") veya "all"
-  from: string;      // staff ID veya "system" | "kiosk" | "dergi" | "ek_hizmetler"
-  type: "task" | "info" | "warning" | "guest_arrived" | "system" | "revision";
+  to: string;        // staff ID, role key ("pazarlama", "kurgu", "admin", "reji", "cagri_sefi", "cagri_temsilci", "odalar", "danisma") veya "all"
+  from: string;      // staff ID veya "system" | "kiosk" | "dergi" | "ek_hizmetler" | "reji" | "pazarlama" | "cagri_merkezi"
+  type: "task" | "info" | "warning" | "guest_arrived" | "system" | "revision" | "delay" | "success";
   title: string;
   message: string;
   read: boolean;
@@ -132,6 +132,16 @@ export interface YouTubeMetadata {
 
 // ── Konuk (Guest) Arayüzü ──
 
+export type GuestTimeStatus = "normal" | "gecikmeli" | "erken_geldi";
+
+export interface StudioDelay {
+  studio: "Gri Stüdyo" | "Orta Stüdyo";
+  delayMinutes: number;
+  reason?: string;
+  reportedAt: string;
+  active: boolean;
+}
+
 export interface Guest {
   id: string;
   name: string;
@@ -164,6 +174,12 @@ export interface Guest {
   cancelledReason?: string;   // İptal gerekçesi
   cancelledAt?: string;       // İptal edilme tarihi
   youtubeMetadata?: YouTubeMetadata; // YouTube yayın takibi ve otomasyonu
+  timeStatus?: GuestTimeStatus;       // Saat durumu: normal, gecikmeli, erken_geldi
+  timeUpdateReason?: string;          // Saat değişiklik gerekçesi (örn: 'Trafikte kaldı')
+  timeUpdatedAt?: string;             // Saatin güncellendiği zaman
+  timeConfirmed?: boolean;            // Temsilci tarafından aranıp vaktinde geleceği teyit edildi mi?
+  timeConfirmedAt?: string;           // Teyit alınma zamanı
+  representativeRemindedAt?: string;  // Temsilciye teyit hatırlatmasının gönderildiği zaman
 }
 
 // ── Personel (Staff) Arayüzü ──
@@ -1454,6 +1470,25 @@ const NOTIFICATIONS_STORAGE_KEY = "bct_os_notifications";
 const AUDIT_LOGS_STORAGE_KEY = "bct_os_audit_logs";
 const ROOMS_STORAGE_KEY = "bct_os_rooms";
 const ROLES_STORAGE_KEY = "bct_os_roles";
+const STUDIO_DELAYS_STORAGE_KEY = "bct_os_studio_delays";
+
+// ── Load / Save Helpers ──
+
+function loadStudioDelays(): Record<string, StudioDelay> {
+  if (typeof window === "undefined") return {};
+  try {
+    const stored = localStorage.getItem(STUDIO_DELAYS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {}
+  return {};
+}
+
+function saveStudioDelays(delays: Record<string, StudioDelay>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STUDIO_DELAYS_STORAGE_KEY, JSON.stringify(delays));
+}
 
 // ── Load / Save Helpers ──
 
@@ -1785,7 +1820,8 @@ if (typeof window !== "undefined") {
       e.key === GUESTS_STORAGE_KEY ||
       e.key === STAFF_STORAGE_KEY ||
       e.key === NOTIFICATIONS_STORAGE_KEY ||
-      e.key === ROOMS_STORAGE_KEY
+      e.key === ROOMS_STORAGE_KEY ||
+      e.key === STUDIO_DELAYS_STORAGE_KEY
     ) {
       notify();
     }
@@ -1844,6 +1880,54 @@ export function addGuest(
   };
   guests.unshift(newGuest); // En başa ekle
   saveGuests(guests);
+
+  // Otomatik Bildirim Tetikleyicileri
+  if (newGuest.status === "kiosk_registered") {
+    addNotification({
+      to: "pazarlama",
+      from: "kiosk",
+      type: "guest_arrived",
+      title: "Konuk Kiosk'tan Kaydoldu",
+      message: `${newGuest.name} (${newGuest.company}) stüdyoya giriş yaptı. Bekleme salonunda hazır.`,
+      link: "/dashboard/pazarlama",
+    });
+    addNotification({
+      to: "reji",
+      from: "kiosk",
+      type: "guest_arrived",
+      title: "Yeni Konuk Sıraya Girdi",
+      message: `${newGuest.name} (${newGuest.company}) ${newGuest.studio || "Gri Stüdyo"} çekim sırasına alındı.`,
+      link: "/dashboard/reji",
+    });
+    addNotification({
+      to: "all",
+      from: "kiosk",
+      type: "guest_arrived",
+      title: `Konuk Geldi: ${newGuest.name}`,
+      message: `${newGuest.name} (${newGuest.company}) stüdyoya giriş yaptı.`,
+      link: "/dashboard/odalar",
+    });
+  } else {
+    addNotification({
+      to: "cagri_sefi",
+      from: "system",
+      type: "info",
+      title: `📅 Yeni Randevu: ${newGuest.name}`,
+      message: `${newGuest.name} (${newGuest.company}) için ${newGuest.appointmentDate || "Bugün"} ${newGuest.appointmentTime} randevusu kaydedildi. Temsilci: ${newGuest.representative || "Atanmadı"}.`,
+      link: "/dashboard/cagri-merkezi",
+    });
+    if (newGuest.representative) {
+      addNotification({
+        to: newGuest.representative,
+        from: "system",
+        type: "info",
+        title: `📅 Randevunuz Listelendi`,
+        message: `${newGuest.name} (${newGuest.appointmentTime}) randevusu başarıyla listenize eklendi.`,
+        link: "/dashboard/odalar",
+      });
+    }
+  }
+
   notify();
   return newGuest;
 }
@@ -1929,13 +2013,13 @@ export function markGuestArrived(guestId: string) {
   guest.status = "kiosk_registered";
   saveGuests(guests);
 
-  // Otomatik Bildirim Tetikleyicileri (Pazarlama & Çağrı Şefi)
+  // Otomatik Bildirim Tetikleyicileri (Pazarlama, Çağrı Şefi, Temsilci, Reji ve Danışma)
   addNotification({
     to: "pazarlama",
     from: "kiosk",
     type: "guest_arrived",
     title: "Konuk Stüdyoya Geldi",
-    message: `${guest.name} (${guest.company}) stüdyoya giriş yaptı. Pazarlama odasına davet edildi.`,
+    message: `${guest.name} (${guest.company}) stüdyoya giriş yaptı. Bekleme salonunda, pazarlama görüşmesi için hazır.`,
     link: "/dashboard/pazarlama",
   });
   addNotification({
@@ -1945,6 +2029,32 @@ export function markGuestArrived(guestId: string) {
     title: "Randevulu Konuk Karşılandı",
     message: `${guest.representative || "Temsilci"} tarafından davet edilen ${guest.name} (${guest.company}) stüdyoda.`,
     link: "/dashboard/cagri-merkezi",
+  });
+  if (guest.representative) {
+    addNotification({
+      to: guest.representative,
+      from: "kiosk",
+      type: "guest_arrived",
+      title: `🎉 Konuğunuz Teşrif Etti: ${guest.name}`,
+      message: `Davet ettiğiniz konuğunuz ${guest.name} (${guest.company}) stüdyoya giriş yaptı ve bekleme salonuna alındı.`,
+      link: "/dashboard/odalar",
+    });
+  }
+  addNotification({
+    to: "reji",
+    from: "kiosk",
+    type: "guest_arrived",
+    title: `Yeni Konuk Bekleme Salonunda: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) stüdyoya geldi. ${guest.studio || "Gri Stüdyo"} çekimi için hazır.`,
+    link: "/dashboard/reji",
+  });
+  addNotification({
+    to: "all",
+    from: "kiosk",
+    type: "guest_arrived",
+    title: `Konuk Bekleme Salonunda: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) karşılama salonunda ağırlanıyor.`,
+    link: "/dashboard/odalar",
   });
 
   // Aktivite Günlüğü (Audit Trail)
@@ -3143,6 +3253,26 @@ export function assignGuestToStudio(guestId: string, studioName: "Gri Stüdyo" |
     link: "/dashboard/reji",
   });
 
+  if (guest.representative) {
+    addNotification({
+      to: guest.representative,
+      from: "reji",
+      type: "info",
+      title: `🎬 Konuğunuz Çekime Alındı`,
+      message: `Konuğunuz ${guest.name}, ${studioName}'ya alındı ve çekim başladı.`,
+      link: "/dashboard/odalar",
+    });
+  }
+
+  addNotification({
+    to: "pazarlama",
+    from: "reji",
+    type: "info",
+    title: `🎬 Çekim Başladı: ${guest.name}`,
+    message: `${guest.name} ${studioName}'da çekimde. Çekim bitiminde pazarlama odasına geçecek.`,
+    link: "/dashboard/pazarlama",
+  });
+
   addAuditLog({
     userName: getCurrentUser()?.name || "Reji Yönetmeni",
     userRole: getCurrentUser()?.role || "Reji Ekibi",
@@ -3168,6 +3298,7 @@ export function completeStudioShoot(guestId: string): boolean {
     status: "shoot_done",
   });
 
+  // 1) Montaj
   addNotification({
     to: "kurgu",
     from: "reji",
@@ -3176,6 +3307,28 @@ export function completeStudioShoot(guestId: string): boolean {
     message: `${guest.name} (${guest.company}) ${guest.studio || "Stüdyo"} çekimi tamamlandı. Ham kayıtlar montaj kuyruğuna aktarıldı.`,
     link: "/dashboard/montaj",
   });
+
+  // 2) Pazarlama
+  addNotification({
+    to: "pazarlama",
+    from: "reji",
+    type: "guest_arrived",
+    title: "Çekim Bitti → Pazarlama Bekliyor",
+    message: `${guest.name} (${guest.company}) stüdyo çekimi tamamlandı, pazarlama görüşmesi için hazır.`,
+    link: "/dashboard/pazarlama",
+  });
+
+  // 3) Temsilci
+  if (guest.representative) {
+    addNotification({
+      to: guest.representative,
+      from: "reji",
+      type: "info",
+      title: `✅ Çekim Tamamlandı: ${guest.name}`,
+      message: `Konuğunuz ${guest.name} çekimi tamamlandı ve pazarlama masasına yönlendirildi.`,
+      link: "/dashboard/odalar",
+    });
+  }
 
   addAuditLog({
     userName: getCurrentUser()?.name || "Reji Yönetmeni",
@@ -3189,6 +3342,311 @@ export function completeStudioShoot(guestId: string): boolean {
   notify();
   return true;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ── STÜDYO SARKMA & GECİKME BİLDİRİM MOTORU ──
+// ════════════════════════════════════════════════════════════════════
+
+export function getStudioDelays(): Record<string, StudioDelay> {
+  return loadStudioDelays();
+}
+
+/**
+ * Reji ekibinin stüdyoda çekimin uzadığını ve sarkma oluştuğunu bildirmesi.
+ * Tüm sisteme, bekleme salonuna ve sıradaki konukların temsilcilerine anında bildirim gönderir.
+ */
+export function sendStudioDelayAlert(
+  studioName: "Gri Stüdyo" | "Orta Stüdyo",
+  delayMinutes: number,
+  reason?: string
+) {
+  const delays = loadStudioDelays();
+  const timeNow = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  delays[studioName] = {
+    studio: studioName,
+    delayMinutes,
+    reason: reason || "Çekim uzadı / Konuk stüdyodan geç çıkıyor",
+    reportedAt: timeNow,
+    active: true,
+  };
+  saveStudioDelays(delays);
+
+  // 1) Broadcast to all units & Odalar
+  addNotification({
+    to: "all",
+    from: "reji",
+    type: "warning",
+    title: `⚠️ ${studioName} Çekim Sarkması (+${delayMinutes} dk)`,
+    message: `${studioName}'da çekim uzadı (+${delayMinutes} dk gecikme). Bekleme salonundaki ve sıradaki randevulu konukların çekim saatleri sarkacaktır. Gerekçe: ${reason || "Çekim uzadı"}`,
+    link: "/dashboard/odalar",
+  });
+
+  // 2) Bu stüdyoyu bekleyen veya sıradaki konukların temsilcilerini uyar
+  const guests = loadGuests();
+  const waitingUpcoming = guests.filter(
+    (g) => (g.status === "kiosk_registered" || g.status === "appointment_set") &&
+           (!g.studio || normalizeStudio(g.studio) === studioName)
+  );
+  const notifiedReps = new Set<string>();
+  waitingUpcoming.forEach((g) => {
+    if (g.representative && !notifiedReps.has(g.representative)) {
+      notifiedReps.add(g.representative);
+      addNotification({
+        to: g.representative,
+        from: "reji",
+        type: "warning",
+        title: `⏱️ ${studioName} Sarktı: Konuğunuz ${g.name} Gecikebilir`,
+        message: `${studioName} çekimi ~${delayMinutes} dk uzadığı için konuğunuz ${g.name} (${g.appointmentTime}) çekim saati sarkabilir. Lütfen konuğa bilgi veriniz.`,
+        link: "/dashboard/odalar",
+      });
+    }
+  });
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Reji Yönetmeni",
+    userRole: getCurrentUser()?.role || "Reji Ekibi",
+    action: "Stüdyo Sarkma / Gecikme Bildirimi",
+    target: studioName,
+    category: "system",
+    details: `${delayMinutes} dakika sarkma bildirildi. Gerekçe: ${reason || "Belirtilmedi"}`,
+  });
+
+  notify();
+}
+
+/**
+ * Reji ekibinin stüdyo gecikmesini kaldırması ve normale döndüğünü teyit etmesi.
+ */
+export function clearStudioDelay(studioName: "Gri Stüdyo" | "Orta Stüdyo") {
+  const delays = loadStudioDelays();
+  if (delays[studioName]) {
+    delays[studioName].active = false;
+    saveStudioDelays(delays);
+
+    addNotification({
+      to: "all",
+      from: "reji",
+      type: "info",
+      title: `✅ ${studioName} Normale Döndü`,
+      message: `${studioName} için çekim sarkması sona erdi. Program normal akışında devam ediyor.`,
+      link: "/dashboard/reji",
+    });
+
+    addAuditLog({
+      userName: getCurrentUser()?.name || "Reji Yönetmeni",
+      userRole: getCurrentUser()?.role || "Reji Ekibi",
+      action: "Stüdyo Gecikmesi Kaldırıldı",
+      target: studioName,
+      category: "system",
+      details: `${studioName} normale döndü olarak işaretlendi.`,
+    });
+
+    notify();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── KONUK SAATİ GÜNCELLEME & YAKLAŞAN RANDEVU TEYİT MOTORU ──
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Konuğun randevu saatini, tarihini ve gecikme/erken gelme durumunu günceller.
+ * İlgili tüm birimlere ve konuğu çağıran personele anlık bildirim fırlatır.
+ */
+export function updateGuestAppointmentTime(
+  guestId: string,
+  newTime: string,
+  newDate?: string,
+  timeStatus: GuestTimeStatus = "normal",
+  reason?: string
+): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  const oldTime = guest.appointmentTime;
+  guest.appointmentTime = newTime;
+  if (newDate) guest.appointmentDate = newDate;
+  guest.timeStatus = timeStatus;
+  guest.timeUpdateReason = reason;
+  guest.timeUpdatedAt = new Date().toLocaleString("tr-TR");
+  // Eğer saat gecikmeli yapıldıysa teyidi sıfırla
+  if (timeStatus === "gecikmeli") {
+    guest.timeConfirmed = false;
+  }
+
+  saveGuests(guests);
+
+  const statusLabel =
+    timeStatus === "gecikmeli"
+      ? "Geç Gelecek"
+      : timeStatus === "erken_geldi"
+      ? "Erken Gelecek / Geldi"
+      : "Saat Güncellendi";
+
+  // Reji, Odalar ve Danışmaya bildirim
+  addNotification({
+    to: "all",
+    from: "cagri_merkezi",
+    type: timeStatus === "gecikmeli" ? "warning" : "info",
+    title: `⏰ Konuk Saati Değişti: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) için randevu saati ${oldTime} → ${newTime} (${statusLabel}) olarak güncellendi.${reason ? ` Not: ${reason}` : ""}`,
+    link: "/dashboard/odalar",
+  });
+
+  // Eğer işlemi yapan temsilcinin kendisi değilse temsilciye özel bildirim
+  const currentUser = getCurrentUser();
+  if (currentUser?.name !== guest.representative && guest.representative) {
+    addNotification({
+      to: guest.representative,
+      from: "system",
+      type: "info",
+      title: `⏰ Konuğunuzun Saati Güncellendi: ${guest.name}`,
+      message: `${guest.name} için randevu saati ${newTime} (${statusLabel}) olarak sisteme işlendi.`,
+      link: "/dashboard/odalar",
+    });
+  }
+
+  addAuditLog({
+    userName: currentUser?.name || "Kullanıcı",
+    userRole: currentUser?.role || "Çağrı Merkezi",
+    action: `Randevu Saati Güncellendi (${statusLabel})`,
+    target: `${guest.name} (${guest.company})`,
+    category: "guest",
+    details: `${oldTime} → ${newTime} | Gerekçe: ${reason || "Belirtilmedi"}`,
+  });
+
+  notify();
+  return true;
+}
+
+/**
+ * Temsilcinin konuğu arayıp vaktinde geleceğini teyit etmesi.
+ */
+export function confirmGuestAppointment(guestId: string, note?: string): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  guest.timeConfirmed = true;
+  guest.timeConfirmedAt = new Date().toISOString();
+  if (note) guest.timeUpdateReason = note;
+  saveGuests(guests);
+
+  const currentUser = getCurrentUser();
+  addAuditLog({
+    userName: currentUser?.name || guest.representative || "Çağrı Temsilcisi",
+    userRole: currentUser?.role || "Çağrı Merkezi",
+    action: "Randevu Teyidi Alındı",
+    target: `${guest.name} (${guest.company})`,
+    category: "guest",
+    details: `Konuk ile görüşüldü, vaktinde geleceği teyit edildi. ${note || ""}`,
+  });
+
+  addNotification({
+    to: "all",
+    from: "cagri_merkezi",
+    type: "info",
+    title: `✅ Randevu Teyit Edildi: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) randevu saatinde (${guest.appointmentTime}) geleceğini teyit etti.`,
+    link: "/dashboard/odalar",
+  });
+
+  notify();
+  return true;
+}
+
+/**
+ * Gelmesine kısa süre kalan ve saatini değiştirmeyen konuk için temsilciye acil teyit hatırlatması gönderir.
+ */
+export function sendGuestArrivalReminder(guestId: string, customNote?: string): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  const nowIso = new Date().toISOString();
+  guest.representativeRemindedAt = nowIso;
+  saveGuests(guests);
+
+  const rep = guest.representative || "Temsilci";
+
+  // Temsilciye doğrudan uyarı
+  addNotification({
+    to: rep,
+    from: "system",
+    type: "warning",
+    title: `⚠️ Yaklaşan Randevu Teyit Uyarısı: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) randevusuna (${guest.appointmentTime}) az süre kaldı ancak henüz giriş yapmadı ve saat değişikliği bildirmedi. Lütfen konuğu arayarak geliş durumunu teyit ediniz! ${customNote ? `(Not: ${customNote})` : ""}`,
+    link: "/dashboard/odalar",
+  });
+
+  // Çağrı Şefine bilgi
+  addNotification({
+    to: "cagri_sefi",
+    from: "system",
+    type: "warning",
+    title: `⚠️ Teyit Bekleyen Konuk: ${guest.name}`,
+    message: `${guest.name} (${rep}) randevu saati (${guest.appointmentTime}) yaklaştı. Temsilciye teyit çağrısı iletildi.`,
+    link: "/dashboard/cagri-merkezi",
+  });
+
+  const currentUser = getCurrentUser();
+  addAuditLog({
+    userName: currentUser?.name || "Sistem Hatırlatıcı",
+    userRole: currentUser?.role || "Otomasyon",
+    action: "Yaklaşan Randevu Uyarısı Gönderildi",
+    target: `${guest.name} (${rep})`,
+    category: "guest",
+    details: `Randevu saati: ${guest.appointmentTime}. Temsilciye teyit bildirimi iletildi.`,
+  });
+
+  notify();
+  return true;
+}
+
+/**
+ * Yaklaşan randevuları otomatik tarayıp saati gelmiş ancak gelmemiş & saatini değiştirmemiş konuklar için
+ * temsilcilerine otomatik bildirim fırlatır.
+ */
+export function checkUpcomingAppointmentReminders(): number {
+  const guests = loadGuests();
+  let count = 0;
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const currentTotalMins = currentHours * 60 + currentMinutes;
+
+  guests.forEach((g) => {
+    if (g.status === "appointment_set") {
+      if (g.timeStatus !== "gecikmeli") {
+        const timeMatch = g.appointmentTime.match(/(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+          const appHours = parseInt(timeMatch[1], 10);
+          const appMins = parseInt(timeMatch[2], 10);
+          const appTotalMins = appHours * 60 + appMins;
+          const diffMins = appTotalMins - currentTotalMins;
+
+          if (diffMins >= -30 && diffMins <= 45) {
+            let alreadyReminded = false;
+            if (g.representativeRemindedAt) {
+              const diffMs = Date.now() - new Date(g.representativeRemindedAt).getTime();
+              if (diffMs < 60 * 60 * 1000) {
+                alreadyReminded = true;
+              }
+            }
+            if (!alreadyReminded) {
+              sendGuestArrivalReminder(g.id);
+              count++;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return count;
+}
+
 
 
 

@@ -4,12 +4,17 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import { type Guest } from "@/lib/store";
+import StudioDelayBanner from "@/components/StudioDelayBanner";
+import StudioDelayModal from "@/components/StudioDelayModal";
+import UpdateTimeModal from "@/components/UpdateTimeModal";
 
 export default function RejiPage() {
   const {
     guests,
     canAccessPage,
     activeRoleDef,
+    studioDelays,
+    clearStudioDelay,
     sendStudioReadyCall,
     assignGuestToStudio,
     completeStudioShoot,
@@ -18,6 +23,8 @@ export default function RejiPage() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [lastCallStudio, setLastCallStudio] = useState<string | null>(null);
+  const [delayModalStudio, setDelayModalStudio] = useState<"Gri Stüdyo" | "Orta Stüdyo" | null>(null);
+  const [updateTimeGuest, setUpdateTimeGuest] = useState<Guest | null>(null);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -200,6 +207,9 @@ export default function RejiPage() {
         </div>
       )}
 
+      {/* ── STÜDYO SARKMA / GECİKME UYARI BANNER'I ── */}
+      <StudioDelayBanner />
+
       {/* ══════════════════════════════════════════════════════════
           BÖLÜM 1: STÜDYO CANLI MONİTÖRLERİ (GRİ STÜDYO & ORTA STÜDYO)
           ══════════════════════════════════════════════════════════ */}
@@ -246,6 +256,35 @@ export default function RejiPage() {
                     <span>📞 Temsilci: <strong className="text-slate-900">{griStudioGuest.representative}</strong></span>
                   </div>
                 </div>
+
+                {/* Gri Stüdyo Çekim Sarkması Durumu / Bildir Butonu */}
+                {studioDelays["Gri Stüdyo"]?.active ? (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-950">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base animate-pulse">⚠️</span>
+                      <div>
+                        <span className="font-extrabold">Çekim Sarktı: +{studioDelays["Gri Stüdyo"].delayMinutes} dk</span>
+                        <p className="text-[11px] text-amber-800">
+                          {studioDelays["Gri Stüdyo"].reason} ({studioDelays["Gri Stüdyo"].reportedAt})
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => clearStudioDelay("Gri Stüdyo")}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition cursor-pointer"
+                    >
+                      Normale Döndü ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDelayModalStudio("Gri Stüdyo")}
+                    className="w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-700">timer</span>
+                    <span>⏱️ Stüdyo Çekim Sarkması / Gecikme Bildir (+15 dk vb.)</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => handleFinishShoot(griStudioGuest.id)}
@@ -325,6 +364,35 @@ export default function RejiPage() {
                     <span>📞 Temsilci: <strong className="text-slate-900">{ortaStudioGuest.representative}</strong></span>
                   </div>
                 </div>
+
+                {/* Orta Stüdyo Çekim Sarkması Durumu / Bildir Butonu */}
+                {studioDelays["Orta Stüdyo"]?.active ? (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-950">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base animate-pulse">⚠️</span>
+                      <div>
+                        <span className="font-extrabold">Çekim Sarktı: +{studioDelays["Orta Stüdyo"].delayMinutes} dk</span>
+                        <p className="text-[11px] text-amber-800">
+                          {studioDelays["Orta Stüdyo"].reason} ({studioDelays["Orta Stüdyo"].reportedAt})
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => clearStudioDelay("Orta Stüdyo")}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition cursor-pointer"
+                    >
+                      Normale Döndü ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDelayModalStudio("Orta Stüdyo")}
+                    className="w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-700">timer</span>
+                    <span>⏱️ Stüdyo Çekim Sarkması / Gecikme Bildir (+15 dk vb.)</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => handleFinishShoot(ortaStudioGuest.id)}
@@ -413,9 +481,24 @@ export default function RejiPage() {
                         </span>
                       )}
                       <span className="text-[10px] font-mono text-slate-400">{g.registrationNo}</span>
+                      {g.timeStatus === "gecikmeli" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          <span>⏳</span>
+                          <span>Geç Gelecek</span>
+                        </span>
+                      )}
+                      {g.timeStatus === "erken_geldi" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
+                          <span>⚡</span>
+                          <span>Erken Geldi</span>
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 truncate mt-0.5">
-                      {g.company} — {g.title} • Randevu: <strong>{g.appointmentTime || "14:00"}</strong>
+                      {g.company} — {g.title} • Randevu: <strong className="text-slate-900">{g.appointmentTime || "14:00"}</strong>
+                      {g.timeUpdateReason && (
+                        <span className="text-amber-700 italic ml-1">({g.timeUpdateReason})</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -426,8 +509,17 @@ export default function RejiPage() {
                   </span>
 
                   <button
+                    onClick={() => setUpdateTimeGuest(g)}
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                    title="Konuğun randevu saatini veya geliş beyanını güncelle"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">schedule</span>
+                    <span className="hidden sm:inline">Saat / Beyan</span>
+                  </button>
+
+                  <button
                     onClick={() => handleTakeToStudio(g.id, "Gri Stüdyo")}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
                   >
                     <span>🎥</span>
                     <span>Gri Stüdyoya Al</span>
@@ -435,7 +527,7 @@ export default function RejiPage() {
 
                   <button
                     onClick={() => handleTakeToStudio(g.id, "Orta Stüdyo")}
-                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
                   >
                     <span>🎬</span>
                     <span>Orta Stüdyoya Al</span>
@@ -504,6 +596,27 @@ export default function RejiPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Stüdyo Çekim Sarkması / Gecikme Modalı ── */}
+      {delayModalStudio && (
+        <StudioDelayModal
+          isOpen={Boolean(delayModalStudio)}
+          studioName={delayModalStudio}
+          currentDelay={studioDelays[delayModalStudio]}
+          onClose={() => setDelayModalStudio(null)}
+          onSuccess={(msg) => showToast(msg)}
+        />
+      )}
+
+      {/* ── Konuk Randevu Saati & Beyan Güncelleme Modalı ── */}
+      {updateTimeGuest && (
+        <UpdateTimeModal
+          isOpen={Boolean(updateTimeGuest)}
+          guest={updateTimeGuest}
+          onClose={() => setUpdateTimeGuest(null)}
+          onSuccess={(msg) => showToast(msg)}
+        />
+      )}
     </div>
   );
 }
