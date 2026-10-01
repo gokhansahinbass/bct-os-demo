@@ -19,12 +19,17 @@ export default function OdalarPage() {
     rooms,
     currentUser,
     activeRole,
+    canAccessPage,
     canAccessRoom,
     isSensitiveBlurred,
     activeRoleDef,
     hasPermission,
     canManageGuest,
   } = useStore();
+
+  if (!canAccessPage("/dashboard/odalar")) {
+    return null;
+  }
   
   // Ana Sekme: Odalar (Çağrı Merkezi) vs. Pazarlama Masası (Ayrı Birim)
   const [mainTab, setMainTab] = useState<"rooms" | "marketers">("rooms");

@@ -10,7 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
+
+  function normalizeStr(str?: string): string {
+    if (!str) return "";
+    return str.trim().toLocaleLowerCase("tr-TR");
+  }
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -18,24 +22,33 @@ export default function LoginPage() {
     setLoading(true);
 
     setTimeout(() => {
-      const trimmedUser = username.trim().toLowerCase();
+      const inputUser = normalizeStr(username);
+      const inputPass = password.trim();
       const staffList = getStaff();
       const rolesList = getRoles();
 
-      // 1. Personel Listesinden Kontrol Et (Admin tarafından verilen şifreler)
-      const matched = staffList.find(
-        (s) =>
-          ((s.username && s.username.toLowerCase() === trimmedUser) ||
-            s.email.toLowerCase() === trimmedUser) &&
-          s.password === password
-      );
+      // 1. Personel Listesinden Kontrol Et (Kullanıcı Adı, E-Posta veya Tam Ad eşleşmesi)
+      const matched = staffList.find((s) => {
+        const staffUsername = normalizeStr(s.username);
+        const staffEmail = normalizeStr(s.email);
+        const staffName = normalizeStr(s.name);
+        const userMatches =
+          (staffUsername && staffUsername === inputUser) ||
+          (staffEmail && staffEmail === inputUser) ||
+          (staffName && staffName === inputUser);
+
+        const staffPassword = (s.password || "bct123").trim();
+        return userMatches && staffPassword === inputPass;
+      });
 
       // 2. Süper Admin Master Fallback (gokhan / bct2026)
-      const isMasterAdmin = trimmedUser === "gokhan" && password === "bct2026";
+      const isMasterAdmin =
+        (inputUser === "gokhan" || inputUser === "gokhan sahinbas" || inputUser === "gökhansahinbas") &&
+        inputPass === "bct2026";
 
       if (matched || isMasterAdmin) {
         const activeStaff = matched || staffList.find((s) => s.id === "usr-gokhan") || staffList[0];
-        
+
         if (activeStaff && activeStaff.status === "inactive") {
           setError("Hesabınız sistem yöneticisi tarafından dondurulmuştur. Lütfen yöneticinizle iletişime geçin.");
           setLoading(false);
@@ -47,9 +60,17 @@ export default function LoginPage() {
         if (isMasterAdmin) {
           roleKey = "admin";
         } else if (activeStaff) {
-          const foundRole = rolesList.find((r) => r.label === activeStaff.role);
+          // Doğrudan rol key veya label eşleştirmesi
+          const foundRole = rolesList.find(
+            (r) =>
+              r.key === activeStaff.role ||
+              r.label.toLocaleLowerCase("tr-TR") === activeStaff.role.toLocaleLowerCase("tr-TR")
+          );
+
           if (foundRole) {
             roleKey = foundRole.key;
+          } else if (activeStaff.role === "dergi_tasarimci" || activeStaff.role.includes("Dergi")) {
+            roleKey = "dergi_tasarimci";
           } else if (activeStaff.isLeader) {
             roleKey = "cagri_sefi";
           } else if (activeStaff.role.includes("Çağrı")) {
@@ -68,21 +89,25 @@ export default function LoginPage() {
         setCurrentUser(activeStaff);
         setActiveRole(roleKey);
 
-        // Rolüne uygun sayfaya yönlendir
-        if (roleKey === "kurgu") {
+        // Rolüne uygun yetkili sayfaya yönlendir
+        if (roleKey === "dergi_tasarimci") {
+          router.push("/dashboard/dergi");
+        } else if (roleKey === "kurgu") {
           router.push("/dashboard/montaj");
         } else if (roleKey === "izleme") {
           router.push("/dashboard/izleme");
         } else if (roleKey === "pazarlama") {
           router.push("/dashboard/pazarlama");
+        } else if (roleKey === "cagri_temsilci" || roleKey === "cagri_sefi") {
+          router.push("/dashboard/cagri-merkezi");
         } else {
           router.push("/dashboard/cagri-merkezi");
         }
       } else {
-        setError("Kullanıcı adı veya yetkilendirilmiş şifre hatalı. Lütfen kontrol ediniz.");
+        setError("Giriş bilgileri hatalı. Kullanıcı adı, e-posta veya şifrenizi kontrol ediniz.");
         setLoading(false);
       }
-    }, 400);
+    }, 350);
   }
 
   return (
@@ -100,14 +125,14 @@ export default function LoginPage() {
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
               <label htmlFor="username" className="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1.5">
-                Kullanıcı Adı veya E-Posta
+                Kullanıcı Adı / E-Posta
               </label>
               <input
                 type="text"
                 id="username"
                 name="username"
                 required
-                placeholder="Örn: gokhan veya ayse"
+                placeholder="Kullanıcı adınız veya e-postanız"
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -117,7 +142,7 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="password" className="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1.5">
-                Admin Tarafından Verilen Şifre
+                Şifre
               </label>
               <input
                 type="password"
@@ -163,58 +188,17 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Quick Demo Helper */}
+          {/* Secure System Notice */}
           <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <button
-              onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer inline-flex items-center gap-1"
-            >
-              <span>🔑</span>
-              <span>{showDemoAccounts ? "Demo Hesapları Gizle ▲" : "Tanımlı Personel Şifrelerini Göster ▼"}</span>
-            </button>
-
-            {showDemoAccounts && (
-              <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs space-y-1.5 animate-fade-in font-mono">
-                <div className="flex items-center justify-between py-0.5 border-b border-slate-200 text-slate-700 font-bold">
-                  <span>Rol / Kullanıcı</span>
-                  <span>Şifre</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>👑 Süper Admin: <strong>gokhan</strong></span>
-                  <span className="font-bold text-blue-700">bct2026</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>👑 Oda 1 Şefi: <strong>ayse</strong></span>
-                  <span className="font-bold text-blue-700">ayse123</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>👑 Oda 2 Şefi: <strong>caner</strong></span>
-                  <span className="font-bold text-blue-700">caner123</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>👑 Oda 3 Şefi: <strong>elif</strong></span>
-                  <span className="font-bold text-blue-700">elif123</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>📞 Çağrı Temsilcisi: <strong>hakan</strong></span>
-                  <span className="font-bold text-blue-700">bct123</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>📈 Pazarlamacı: <strong>selin</strong></span>
-                  <span className="font-bold text-blue-700">selin123</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-600">
-                  <span>🎬 İzleme / Revize: <strong>mert</strong></span>
-                  <span className="font-bold text-blue-700">mert123</span>
-                </div>
-              </div>
-            )}
+            <p className="text-xs text-[#64748B]">
+              Hesap bilgileriniz yöneticiniz tarafından tanımlanır. Şifrenizi unuttuysanız sistem yöneticinize danışınız.
+            </p>
           </div>
         </div>
 
-        {/* Version Note */}
+        {/* Security & Version Note */}
         <div className="mt-6 text-center">
-          <span className="text-xs text-[#94A3B8] font-mono">BCT-OS v2.4 · RBAC &amp; Granular Yetki Sistemi Aktif</span>
+          <span className="text-xs text-[#94A3B8] font-mono">BCT-OS v2.4 · Güvenli Kimlik Doğrulama</span>
         </div>
       </main>
     </div>

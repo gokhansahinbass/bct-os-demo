@@ -98,82 +98,89 @@ export default function Header() {
 
       {/* Right: Role Switcher + Notification + Time */}
       <div className="flex items-center gap-3">
-        {/* Interactive Role Switcher for Admin Testing */}
-        <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-            <span>🛡️</span> Rol:
-          </span>
-          <select
-            value={activeRole}
-            onChange={(e) => handleRoleChange(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-            title="Sistemi farklı rollerin gözünden canlı test edin"
-          >
-            {roles.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.label} {r.key === "admin" ? "(Süper Admin)" : `(${r.department})`}
-              </option>
-            ))}
-          </select>
-
-          {/* Çağrı Temsilcisi Seçici (Hakan Demir, Emre Çelik vb. arasındaki yetki farkını test etmek için) */}
-          {activeRole === "cagri_temsilci" && (
-            <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
-              <span className="text-[10px] font-bold text-blue-600">👤 Temsilci:</span>
-              <select
-                value={currentUser?.id || "usr-hakan"}
-                onChange={(e) => {
-                  const found = staff.find((s) => s.id === e.target.value);
-                  if (found) setCurrentUser(found);
-                }}
-                className="bg-transparent text-xs font-bold text-blue-900 focus:outline-none cursor-pointer"
-                title="Hangi çağrı temsilcisinin gözünden test etmek istediğinizi seçin"
-              >
-                {staff
-                  .filter((s) => s.room && !s.isLeader && s.role.includes("Çağrı"))
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
-
-          {/* Çağrı Şefi Seçici (Oda 1, Oda 2, Oda 3 Şefleri Arasında Geçiş) */}
-          {activeRole === "cagri_sefi" && (
-            <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
-              <span className="text-[10px] font-bold text-indigo-600">👑 Şef:</span>
-              <select
-                value={currentUser?.id || "usr-ayse"}
-                onChange={(e) => {
-                  const found = staff.find((s) => s.id === e.target.value);
-                  if (found) setCurrentUser(found);
-                }}
-                className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer"
-                title="Hangi oda şefinin gözünden test etmek istediğinizi seçin"
-              >
-                {staff
-                  .filter((s) => s.room && s.isLeader)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
-
-          {activeRole !== "admin" && (
-            <button
-              onClick={() => handleRoleChange("admin")}
-              className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold hover:bg-red-200 cursor-pointer transition ml-1"
-              title="Süper Admin Moduna Dön"
+        {/* Interactive Role Switcher: SADECE Gerçek Süper Admin ise görünür, normal personel değiştiremez */}
+        {(currentUser?.role === "Süper Admin" || currentUser?.username === "gokhan" || currentUser?.id === "usr-gokhan") ? (
+          <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+              <span>🛡️</span> Rol:
+            </span>
+            <select
+              value={activeRole}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+              title="Sistemi farklı rollerin gözünden canlı test edin"
             >
-              ✕ Admin'e Dön
-            </button>
-          )}
-        </div>
+              {roles.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label} {r.key === "admin" ? "(Süper Admin)" : `(${r.department})`}
+                </option>
+              ))}
+            </select>
+
+            {/* Çağrı Temsilcisi Seçici (Hakan Demir, Emre Çelik vb. arasındaki yetki farkını test etmek için) */}
+            {activeRole === "cagri_temsilci" && (
+              <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
+                <span className="text-[10px] font-bold text-blue-600">👤 Temsilci:</span>
+                <select
+                  value={currentUser?.id || "usr-hakan"}
+                  onChange={(e) => {
+                    const found = staff.find((s) => s.id === e.target.value);
+                    if (found) setCurrentUser(found);
+                  }}
+                  className="bg-transparent text-xs font-bold text-blue-900 focus:outline-none cursor-pointer"
+                  title="Hangi çağrı temsilcisinin gözünden test etmek istediğinizi seçin"
+                >
+                  {staff
+                    .filter((s) => s.room && !s.isLeader && s.role.includes("Çağrı"))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {/* Çağrı Şefi Seçici (Oda 1, Oda 2, Oda 3 Şefleri Arasında Geçiş) */}
+            {activeRole === "cagri_sefi" && (
+              <div className="flex items-center gap-1 pl-2 border-l border-slate-300 ml-1">
+                <span className="text-[10px] font-bold text-indigo-600">👑 Şef:</span>
+                <select
+                  value={currentUser?.id || "usr-ayse"}
+                  onChange={(e) => {
+                    const found = staff.find((s) => s.id === e.target.value);
+                    if (found) setCurrentUser(found);
+                  }}
+                  className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer"
+                  title="Hangi oda şefinin gözünden test etmek istediğinizi seçin"
+                >
+                  {staff
+                    .filter((s) => s.room && s.isLeader)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.room === "oda-1" ? "Oda 1" : s.room === "oda-2" ? "Oda 2" : "Oda 3"})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {activeRole !== "admin" && (
+              <button
+                onClick={() => handleRoleChange("admin")}
+                className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold hover:bg-red-200 cursor-pointer transition ml-1"
+                title="Süper Admin Moduna Dön"
+              >
+                ✕ Admin'e Dön
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl">
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span className="text-xs font-bold text-slate-700">{activeRoleDef?.label || "Yetkili Kullanıcı"}</span>
+          </div>
+        )}
         {/* Notification Bell */}
         <div className="relative">
           <button

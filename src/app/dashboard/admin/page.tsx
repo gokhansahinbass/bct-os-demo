@@ -17,9 +17,13 @@ import {
 } from "@/lib/store";
 
 export default function AdminPage() {
-  const { staff, guests, roles } = useStore();
+  const { staff, guests, roles, canAccessPage } = useStore();
   const [activeTab, setActiveTab] = useState<"staff" | "rbac" | "system">("staff");
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  if (!canAccessPage("/dashboard/admin")) {
+    return null;
+  }
 
   // ── Personel Listesi State ──
   const [search, setSearch] = useState("");

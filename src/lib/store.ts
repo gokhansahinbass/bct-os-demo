@@ -20,9 +20,31 @@ export type GuestStatus =
 
 export type ServiceType = "dergi" | "haber_sitesi" | "sosyal_medya" | "ek_hizmet" | "video";
 
+export interface MagazineFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string; // 'image' | 'pdf' | 'doc' | 'archive' | 'text' | 'other'
+  dataUrl?: string; // base64 dataUrl or storage URL
+  uploadedAt: string;
+  uploadedBy?: string;
+}
+
+export type MagazineStatus =
+  | "icerik_bekleniyor"
+  | "icerik_geldi"
+  | "tasarimda"
+  | "baski_bekliyor"
+  | "tamamlandi";
+
 export interface ServiceDetail {
   label: string;       // Örn: "Ön Kapak", "2 Sayfa Röportaj", "Reels Kurgu"
   checked: boolean;
+  status?: "bekliyor" | "yapiliyor" | "tamamlandi";
+  completedAt?: string;
+  completedBy?: string;
+  link?: string;       // Yayınlanan link (reels linki, haber linki vb.)
+  note?: string;
 }
 
 export interface Service {
@@ -33,7 +55,14 @@ export interface Service {
   customNote?: string;        // Serbest alan
   price: number;
   createdAt: string;
+  // Dergi Masası ve Ek Hizmet Gelişmiş Takip
+  magazineStatus?: MagazineStatus;
+  magazineNotes?: string;
+  magazineFiles?: MagazineFile[];
+  completedAt?: string;
+  completedBy?: string;
 }
+
 
 // ── Genişletilmiş Sosyal Medya ──
 
@@ -188,6 +217,8 @@ export const PERMISSION_GROUPS = {
     { key: "cagri", label: "Çağrı Merkezi", shortLabel: "Çağrı", desc: "Randevu & konuk davet modülü", icon: "call" },
     { key: "odalar", label: "Oda & Konuk Takibi", shortLabel: "Odalar", desc: "Satış odaları konuk randevu tabloları", icon: "meeting_room" },
     { key: "pazarlama", label: "Pazarlama Masası", shortLabel: "Pazarlama", desc: "Ek paket satışı ve tahsilat takibi", icon: "campaign" },
+    { key: "dergi", label: "Dergi Masası & İçerik", shortLabel: "Dergi", desc: "Dergi siparişleri, sayfa/kapak takibi ve içerik toplama", icon: "menu_book" },
+    { key: "ek_hizmetler", label: "Ek Hizmetler Takibi", shortLabel: "Ek Hizmet", desc: "Haber sitesi, reels, shorts ve sosyal medya teslimleri", icon: "checklist" },
     { key: "montaj", label: "Kurgu & Montaj", shortLabel: "Montaj", desc: "Video kurgu ve ham kayıt işleme", icon: "movie_edit" },
     { key: "izleme", label: "İzleme Masası", shortLabel: "İzleme", desc: "Kalite kontrol ve onay masası", icon: "visibility" },
     { key: "revize", label: "Revize Yönetimi", shortLabel: "Revize", desc: "Video revize notları ve düzeltmeler", icon: "rate_review" },
@@ -218,11 +249,23 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     label: "Süper Admin",
     color: "red",
     department: "Yönetim",
-    description: "Tüm sistem, odalar, finans ve personel yetkilerine tam erişim.",
+    description: "Tüm sistem, odalar, finans, dergi ve personel yetkilerine tam erişim.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true,
+      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: true,
+    },
+  },
+  {
+    key: "dergi_tasarimci",
+    label: "Dergi Tasarım & Editör",
+    color: "cyan",
+    department: "Dergi Masası",
+    description: "Müşterilerin dergi siparişlerini takip etme, içerik/dosya toplama ve baskı onaylama.",
+    permissions: {
+      cagri: false, odalar: false, pazarlama: false, dergi: true, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      room_oda1: false, room_oda2: false, room_oda3: false,
+      view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
   },
   {
@@ -232,7 +275,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Çağrı Merkezi",
     description: "Oda ekibini yönetme, teyit hedefleri belirleme ve bizzat kendi konuklarını getirme yetkisi.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -244,7 +287,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Çağrı Merkezi",
     description: "Bireysel konuk randevusu oluşturma, teyit alma ve getirdiği konukları takip etme.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -256,7 +299,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Pazarlama Masası",
     description: "Dergi, haber sitesi, reels paket satışı ve tahsilat yönetimi.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: true, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: false,
     },
@@ -268,7 +311,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Kurgu & Montaj",
     description: "Ham video kurgusu, alt bant hazırlama ve revize takibi.",
     permissions: {
-      cagri: false, odalar: false, pazarlama: false, montaj: true, izleme: false, revize: true, yayin: false, yonetim: false, admin: false,
+      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: true, yayin: false, yonetim: false, admin: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: false, view_guest_contact: false, can_edit_packages: false, can_delete_records: false,
     },
@@ -280,7 +323,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "İzleme Masası",
     description: "Video kalite onayı, revize notu düşme ve sevk kontrolü.",
     permissions: {
-      cagri: false, odalar: false, pazarlama: false, montaj: false, izleme: true, revize: true, yayin: true, yonetim: false, admin: false,
+      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: true, revize: true, yayin: true, yonetim: false, admin: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: false, view_guest_contact: false, can_edit_packages: false, can_delete_records: false,
     },
@@ -333,9 +376,61 @@ const DEFAULT_GUESTS: Guest[] = [
       { id: "note-2", time: "12:40", percent: 49.67, author: "Müşteri", authorType: "client", text: "Konuşmacının yaka mikrofonu hışırdamış, sesi biraz toparlayalım.", resolved: false, createdAt: new Date().toISOString() },
     ],
     services: [
-      { id: "svc-1", type: "dergi", details: [{ label: "Ön Kapak", checked: true }, { label: "2 Sayfa Röportaj", checked: true }], price: 25000, createdAt: new Date().toISOString() },
-      { id: "svc-2", type: "haber_sitesi", details: [{ label: "Ulusal Basın Dağıtım", checked: true }], quantity: 15, price: 10000, createdAt: new Date().toISOString() },
-      { id: "svc-3", type: "video", details: [{ label: "VIP Kalıcı Video", checked: true }, { label: "Sosyal Medya Yayını", checked: true }], price: 25000, createdAt: new Date().toISOString() },
+      {
+        id: "svc-1",
+        type: "dergi",
+        details: [{ label: "Ön Kapak", checked: true }, { label: "2 Sayfa Röportaj", checked: true }],
+        price: 25000,
+        createdAt: new Date().toISOString(),
+        magazineStatus: "icerik_geldi",
+        magazineNotes: "Konuk yüksek çözünürlüklü kapak fotoğrafı ve Word röportaj metnini iletti. Başlık: 'Yapay Zeka ve Geleceğin Yazılım Mimarisi'.",
+        magazineFiles: [
+          {
+            id: "mfile-1",
+            name: "Boran_Sahin_Kapak_4K.jpg",
+            size: 4200000,
+            type: "image",
+            uploadedAt: "12 Ekim 2026 14:40",
+            uploadedBy: "Ayşe Yılmaz",
+          },
+          {
+            id: "mfile-2",
+            name: "YazilimAS_Roportaj_Metni_Final.docx",
+            size: 145000,
+            type: "doc",
+            uploadedAt: "12 Ekim 2026 14:45",
+            uploadedBy: "İrem Kaya",
+          },
+        ],
+      },
+      {
+        id: "svc-2",
+        type: "haber_sitesi",
+        details: [
+          { label: "Ulusal Basın Dağıtım (15 Haber Sitesi)", checked: true, status: "yapiliyor", note: "3 sitede yayına alındı, Google News indekslendi." }
+        ],
+        quantity: 15,
+        price: 10000,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "svc-3",
+        type: "sosyal_medya",
+        details: [
+          { label: "5 Adet Instagram Reels", checked: true, status: "bekliyor", note: "Kurgu bittikten sonra en çarpıcı 5 kesit hazırlanacak." },
+          { label: "YouTube Shorts & TikTok Kesitleri", checked: true, status: "bekliyor" },
+          { label: "Instagram Öne Çıkan Tasarımı", checked: true, status: "tamamlandi", completedAt: "12 Ekim 2026 15:30", completedBy: "Selin Karaca" },
+        ],
+        price: 15000,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "svc-4",
+        type: "video",
+        details: [{ label: "VIP Kalıcı Video", checked: true }, { label: "Sosyal Medya Yayını", checked: true }],
+        price: 10000,
+        createdAt: new Date().toISOString(),
+      },
     ],
     socialMedia: createDefaultSocialMedia("boransahin", "yazilimas.com", "+90 (532) 840 19 20"),
     room: "oda-1",
@@ -397,9 +492,31 @@ const DEFAULT_GUESTS: Guest[] = [
     createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
     notes: [],
     services: [
-      { id: "svc-7", type: "dergi", details: [{ label: "1 Sayfa Röportaj", checked: true }], price: 15000, createdAt: new Date().toISOString() },
-      { id: "svc-8", type: "haber_sitesi", details: [{ label: "Ulusal Basın Dağıtım", checked: true }], quantity: 15, price: 10000, createdAt: new Date().toISOString() },
-      { id: "svc-9", type: "video", details: [{ label: "VIP Kalıcı Video", checked: true }], price: 25000, createdAt: new Date().toISOString() },
+      {
+        id: "svc-7",
+        type: "dergi",
+        details: [{ label: "1 Sayfa Röportaj", checked: true }],
+        price: 15000,
+        createdAt: new Date().toISOString(),
+        magazineStatus: "icerik_bekleniyor",
+        magazineNotes: "Konuktan yüksek çözünürlüklü büro logosu ve portre fotoğrafı bekleniyor. WhatsApp'tan hatırlatma yapıldı.",
+        magazineFiles: [],
+      },
+      {
+        id: "svc-8",
+        type: "haber_sitesi",
+        details: [{ label: "Ulusal Basın Dağıtım (10 Site)", checked: true, status: "bekliyor" }],
+        quantity: 10,
+        price: 10000,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "svc-9",
+        type: "video",
+        details: [{ label: "VIP Kalıcı Video", checked: true }],
+        price: 25000,
+        createdAt: new Date().toISOString(),
+      },
     ],
     socialMedia: createDefaultSocialMedia("canandemir.av", "demirhukuk.com", "+90 (533) 456 12 78"),
     room: "oda-1",
@@ -1171,6 +1288,20 @@ const DEFAULT_STAFF: StaffMember[] = [
     avatar: "MD",
     createdAt: "2024-06-10",
   },
+
+  // ── DERGİ MASASI (Dergi tasarımı, içerik toplama ve basım takibi) ──
+  {
+    id: "usr-irem",
+    name: "İrem Kaya",
+    email: "irem@bct.com",
+    username: "irem",
+    password: "irem123",
+    role: "Dergi Tasarım & Editör",
+    department: "Dergi Masası",
+    status: "active",
+    avatar: "İK",
+    createdAt: "2024-03-01",
+  },
 ];
 
 const DEFAULT_NOTIFICATIONS: Notification[] = [
@@ -1309,22 +1440,26 @@ function loadStaff(): StaffMember[] {
         const existingMap = new Map(parsed.map((s: StaffMember) => [s.id, s]));
         const merged = DEFAULT_STAFF.map((ds) => {
           const existing = existingMap.get(ds.id);
-          return existing ? { 
-            ...ds, 
-            ...existing, 
-            role: ds.role, 
-            room: ds.room, 
-            isLeader: ds.isLeader,
-            username: existing.username || ds.username,
-            password: existing.password || ds.password,
-          } : ds;
+          return existing
+            ? {
+                ...ds,
+                ...existing,
+                role: existing.role || ds.role,
+                department: existing.department || ds.department,
+                room: existing.room !== undefined ? existing.room : ds.room,
+                isLeader: existing.isLeader !== undefined ? existing.isLeader : ds.isLeader,
+                username: (existing.username || ds.username || "").trim(),
+                password: (existing.password || ds.password || "").trim(),
+              }
+            : ds;
         });
         parsed.forEach((s: StaffMember) => {
           if (!DEFAULT_STAFF.some((ds) => ds.id === s.id)) {
+            const cleanUser = (s.username || (s.email ? s.email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "") : "user")).trim();
             merged.push({
               ...s,
-              username: s.username || s.email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, ""),
-              password: s.password || "bct123",
+              username: cleanUser,
+              password: (s.password || "bct123").trim(),
             });
           }
         });
@@ -1563,6 +1698,125 @@ export function updateServiceInGuest(guestId: string, serviceId: string, updates
   const totalPrice = guests[idx].services.reduce((sum, s) => sum + s.price, 0);
   guests[idx].amount = totalPrice.toLocaleString("tr-TR");
   guests[idx].vip = totalPrice > 0 && guests[idx].services.length > 0;
+  saveGuests(guests);
+  notify();
+}
+
+// ── Dergi ve İçerik Yönetimi API ──
+
+export function updateMagazineStatus(
+  guestId: string,
+  serviceId: string,
+  status: MagazineStatus,
+  completedBy?: string
+) {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc) return;
+  svc.magazineStatus = status;
+  if (status === "tamamlandi") {
+    svc.completedAt = new Date().toLocaleString("tr-TR");
+    svc.completedBy = completedBy || "Dergi Editörü";
+  } else {
+    svc.completedAt = undefined;
+    svc.completedBy = undefined;
+  }
+  saveGuests(guests);
+  notify();
+}
+
+export function updateMagazineNotes(guestId: string, serviceId: string, notes: string) {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc) return;
+  svc.magazineNotes = notes;
+  saveGuests(guests);
+  notify();
+}
+
+export function addMagazineFile(
+  guestId: string,
+  serviceId: string,
+  file: Omit<MagazineFile, "id" | "uploadedAt">
+): MagazineFile | undefined {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return undefined;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc) return undefined;
+  if (!svc.magazineFiles) svc.magazineFiles = [];
+  const newFile: MagazineFile = {
+    ...file,
+    id: "mfile-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
+    uploadedAt: new Date().toLocaleString("tr-TR"),
+  };
+  svc.magazineFiles.push(newFile);
+  if (!svc.magazineStatus || svc.magazineStatus === "icerik_bekleniyor") {
+    svc.magazineStatus = "icerik_geldi";
+  }
+  saveGuests(guests);
+  notify();
+  return newFile;
+}
+
+export function deleteMagazineFile(guestId: string, serviceId: string, fileId: string) {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc || !svc.magazineFiles) return;
+  svc.magazineFiles = svc.magazineFiles.filter((f) => f.id !== fileId);
+  saveGuests(guests);
+  notify();
+}
+
+// ── Ek Hizmetler (Haber Sitesi, Reels, Shorts vb.) API ──
+
+export function updateExtraServiceItem(
+  guestId: string,
+  serviceId: string,
+  detailLabel: string,
+  updates: Partial<ServiceDetail>
+) {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc) return;
+  const detail = svc.details.find((d) => d.label === detailLabel);
+  if (!detail) return;
+  Object.assign(detail, updates);
+  saveGuests(guests);
+  notify();
+}
+
+export function toggleExtraServiceStatus(
+  guestId: string,
+  serviceId: string,
+  detailLabel: string,
+  completedBy?: string
+) {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return;
+  const svc = guest.services.find((s) => s.id === serviceId);
+  if (!svc) return;
+  const detail = svc.details.find((d) => d.label === detailLabel);
+  if (!detail) return;
+
+  if (detail.status === "tamamlandi") {
+    detail.status = "bekliyor";
+    detail.completedAt = undefined;
+    detail.completedBy = undefined;
+  } else {
+    detail.status = "tamamlandi";
+    detail.completedAt = new Date().toLocaleString("tr-TR");
+    detail.completedBy = completedBy || "Operasyon";
+  }
   saveGuests(guests);
   notify();
 }
@@ -1847,6 +2101,8 @@ export function canRoleAccessPath(roleKey: string, pathname: string): boolean {
   if (pathname.includes("/cagri-merkezi")) return hasRolePermission(roleKey, "cagri");
   if (pathname.includes("/odalar")) return hasRolePermission(roleKey, "odalar");
   if (pathname.includes("/pazarlama")) return hasRolePermission(roleKey, "pazarlama");
+  if (pathname.includes("/dergi")) return hasRolePermission(roleKey, "dergi");
+  if (pathname.includes("/ek-hizmetler")) return hasRolePermission(roleKey, "ek_hizmetler");
   if (pathname.includes("/montaj")) return hasRolePermission(roleKey, "montaj");
   if (pathname.includes("/izleme")) return hasRolePermission(roleKey, "izleme");
   if (pathname.includes("/revize")) return hasRolePermission(roleKey, "revize");
