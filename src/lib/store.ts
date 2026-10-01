@@ -251,6 +251,7 @@ export const PERMISSION_GROUPS = {
     { key: "revize", label: "Revize Yönetimi", shortLabel: "Revize", desc: "Video revize notları ve düzeltmeler", icon: "rate_review" },
     { key: "yayin", label: "Dijital Kart & Yayın", shortLabel: "Yayın", desc: "QR kart ve canlı yayın teslimi", icon: "qr_code_2" },
     { key: "yonetim", label: "Yönetim Kokpiti", shortLabel: "Yönetim", desc: "Üst düzey ciro ve ekip analitiği", icon: "insights" },
+    { key: "reji", label: "Reji & Stüdyo Çağrı", shortLabel: "Reji", desc: "Gri ve Orta Stüdyo çekim durumu ve bekleme salonundan konuk çağırma", icon: "videocam" },
     { key: "admin", label: "Sistem Ayarları", shortLabel: "Admin", desc: "Personel, RBAC ve veri yönetimi", icon: "admin_panel_settings" },
   ] as PermissionItem[],
 
@@ -278,7 +279,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Yönetim",
     description: "Tüm sistem, odalar, finans, dergi ve personel yetkilerine tam erişim.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true,
+      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true, reji: true,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: true,
     },
@@ -353,6 +354,18 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
       cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: true, revize: true, yayin: true, yonetim: false, admin: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: false, view_guest_contact: false, can_edit_packages: false, can_delete_records: false,
+    },
+  },
+  {
+    key: "reji",
+    label: "Reji Yönetmeni / Stüdyo Sorumlusu",
+    color: "purple",
+    department: "Stüdyo & Reji",
+    description: "Gri Stüdyo ve Orta Stüdyo canlı çekim akışı, bekleme salonundan konuk daveti ve stüdyo çağrıları.",
+    permissions: {
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: true,
+      room_oda1: true, room_oda2: true, room_oda3: true,
+      view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
   },
 ];
@@ -1328,6 +1341,18 @@ const DEFAULT_STAFF: StaffMember[] = [
     status: "active",
     avatar: "İK",
     createdAt: "2024-03-01",
+  },
+  {
+    id: "usr-reji",
+    name: "Emre Vural (Reji)",
+    email: "reji@bct.com",
+    username: "reji",
+    password: "reji123",
+    role: "Reji Yönetmeni / Stüdyo Sorumlusu",
+    department: "Stüdyo & Reji Departmanı",
+    status: "active",
+    avatar: "EV",
+    createdAt: "2024-03-15",
   },
 ];
 
@@ -2669,6 +2694,7 @@ export function canRoleAccessPath(roleKey: string, pathname: string): boolean {
   if (pathname.includes("/izleme")) return hasRolePermission(roleKey, "izleme");
   if (pathname.includes("/revize")) return hasRolePermission(roleKey, "revize");
   if (pathname.includes("/yayin")) return hasRolePermission(roleKey, "yayin");
+  if (pathname.includes("/reji")) return hasRolePermission(roleKey, "reji") || roleKey === "admin" || roleKey === "reji";
   if (pathname.includes("/yonetim")) return hasRolePermission(roleKey, "yonetim");
   if (pathname.includes("/admin")) return hasRolePermission(roleKey, "admin");
   return true;
@@ -3060,6 +3086,110 @@ export function updateGuestYouTube(guestId: string, metadata: Partial<YouTubeMet
   notify();
   return true;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ── REJİ & STÜDYO ÇAĞRI MOTORU (Gri Stüdyo & Orta Stüdyo) ──
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Reji ekibinin "Gri Stüdyo Boş" veya "Orta Stüdyo Boş — Çekim Alabiliriz" çağrısı yayınlaması.
+ * Tüm sisteme, bekleme salonuna ve çağrı merkezine yüksek öncelikli bildirim ve teftiş izi düşürür.
+ */
+export function sendStudioReadyCall(studioName: "Gri Stüdyo" | "Orta Stüdyo") {
+  addNotification({
+    to: "all",
+    from: "reji",
+    type: "warning",
+    title: `📢 ${studioName} Boş — Çekim Alabiliriz!`,
+    message: `${studioName} boşalmıştır. Bekleme salonundan sıradaki konuk stüdyoya davet edilebilir.`,
+    link: "/dashboard/reji",
+  });
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Reji Yönetmeni",
+    userRole: getCurrentUser()?.role || "Reji Ekibi",
+    action: "Stüdyo Boş Çağrısı Yayınlandı",
+    target: studioName,
+    category: "system",
+    details: `${studioName} için çekim alabiliriz duyurusu yapıldı. Bekleme salonuna sevk alarmı verildi.`,
+  });
+
+  notify();
+}
+
+/**
+ * Bekleme salonundaki bir konuğun doğrudan Gri Stüdyo veya Orta Stüdyo'ya çekime alınması.
+ * Konuğun durumu 'in_studio' yapılır, stüdyosu atanır ve anlık çekim saati damgalanır.
+ */
+export function assignGuestToStudio(guestId: string, studioName: "Gri Stüdyo" | "Orta Stüdyo"): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  const nowTime = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+
+  updateGuest(guestId, {
+    status: "in_studio",
+    studio: studioName,
+    shootTime: nowTime,
+  });
+
+  addNotification({
+    to: "all",
+    from: "reji",
+    type: "guest_arrived",
+    title: `Konuk ${studioName}'ya Alındı`,
+    message: `${guest.name} (${guest.company}) bekleme salonundan ${studioName}'ya alındı ve canlı çekim başladı.`,
+    link: "/dashboard/reji",
+  });
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Reji Yönetmeni",
+    userRole: getCurrentUser()?.role || "Reji Ekibi",
+    action: "Konuk Çekime Alındı",
+    target: `${guest.name} — ${studioName}`,
+    category: "guest",
+    details: `Bekleme salonundan ${studioName}'ya sevk edildi. Başlangıç saati: ${nowTime}`,
+  });
+
+  notify();
+  return true;
+}
+
+/**
+ * Stüdyodaki çekimin tamamlanıp montaj ve kurgu kuyruğuna devredilmesi.
+ */
+export function completeStudioShoot(guestId: string): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  updateGuest(guestId, {
+    status: "shoot_done",
+  });
+
+  addNotification({
+    to: "kurgu",
+    from: "reji",
+    type: "task",
+    title: "Çekim Bitti → Kurgu Sırasında",
+    message: `${guest.name} (${guest.company}) ${guest.studio || "Stüdyo"} çekimi tamamlandı. Ham kayıtlar montaj kuyruğuna aktarıldı.`,
+    link: "/dashboard/montaj",
+  });
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Reji Yönetmeni",
+    userRole: getCurrentUser()?.role || "Reji Ekibi",
+    action: "Çekim Tamamlandı",
+    target: `${guest.name} (${guest.company})`,
+    category: "guest",
+    details: `${guest.studio || "Stüdyo"} çekimi tamamlandı, kurgu kuyruğuna aktarıldı.`,
+  });
+
+  notify();
+  return true;
+}
+
 
 
 

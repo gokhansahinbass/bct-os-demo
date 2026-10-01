@@ -138,6 +138,29 @@ export default function MontajPage() {
     );
   };
 
+  // ── Stüdyo Değiştirici (Montaj ve Kurgu Ekibinin Stüdyo Değiştirebilmesi) ──
+  const StudioSwitcher = ({ card }: { card: Guest }) => {
+    return (
+      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 text-[#0F172A] text-xs font-mono border border-slate-300 shadow-2xs transition-all">
+        <span className="material-symbols-outlined text-[15px] text-blue-600">videocam</span>
+        <select
+          value={card.studio || "Gri Stüdyo"}
+          onChange={(e) => {
+            const newStudio = e.target.value;
+            updateGuest(card.id, { studio: newStudio });
+            showToast(`${card.name} stüdyosu "${newStudio}" olarak güncellendi.`);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs font-semibold bg-transparent text-slate-800 border-none focus:outline-none cursor-pointer"
+          title="Montaj ekibi stüdyoyu değiştirebilir (Gri Stüdyo / Orta Stüdyo)"
+        >
+          <option value="Gri Stüdyo">Gri Stüdyo</option>
+          <option value="Orta Stüdyo">Orta Stüdyo</option>
+        </select>
+      </div>
+    );
+  };
+
   if (!canAccessPage("/dashboard/montaj")) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-xl mx-auto my-12 space-y-4">
@@ -276,10 +299,7 @@ export default function MontajPage() {
                       <VipBadge card={card} />
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                        <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
-                        {card.studio}
-                      </span>
+                      <StudioSwitcher card={card} />
                       <span className="inline-flex items-center gap-1 text-slate-500 text-[11px]">
                         <span className="material-symbols-outlined text-[14px]">schedule</span>
                         {card.shootTime}
@@ -369,10 +389,7 @@ export default function MontajPage() {
                       <VipBadge card={card} />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                        <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
-                        {card.studio}
-                      </span>
+                      <StudioSwitcher card={card} />
                       <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                     </div>
 
@@ -461,10 +478,7 @@ export default function MontajPage() {
                     <VipBadge card={card} />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
-                      {card.studio}
-                    </span>
+                    <StudioSwitcher card={card} />
                     <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                   </div>
 

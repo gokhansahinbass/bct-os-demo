@@ -70,6 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (activeRole === "kurgu") return "/dashboard/montaj";
     if (activeRole === "izleme") return "/dashboard/izleme";
     if (activeRole === "pazarlama") return "/dashboard/pazarlama";
+    if (activeRole === "reji") return "/dashboard/reji";
     return "/dashboard/cagri-merkezi";
   }
 
