@@ -2263,6 +2263,89 @@ export function updateStaffPassword(id: string, newPassword: string): boolean {
   return true;
 }
 
+export interface PasswordChangeResult {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Kullanıcıların kendi giriş şifrelerini güvenli bir şekilde değiştirmesini sağlar.
+ * 1) Eski şifre doğrulaması yapar.
+ * 2) Yeni şifrenin geçerliliğini ve teyidini denetler.
+ * 3) Değişikliği anında hem yerel belleğe (localStorage) hem de Supabase buluta kaydeder.
+ * 4) İşlemi Denetim İzi (Audit Log) ve bildirim sistemine yansıtır.
+ */
+export function changeStaffPassword(
+  staffId: string,
+  currentPass: string,
+  newPass: string,
+  confirmPass: string
+): PasswordChangeResult {
+  const staff = loadStaff();
+  const member = staff.find((s) => s.id === staffId);
+  if (!member) {
+    return { success: false, message: "Kullanıcı kaydı bulunamadı." };
+  }
+
+  const currentStored = (member.password || "bct123").trim();
+  if (currentStored !== currentPass.trim()) {
+    return { success: false, message: "Mevcut şifrenizi hatalı girdiniz." };
+  }
+
+  const cleanNewPass = newPass.trim();
+  const cleanConfirmPass = confirmPass.trim();
+
+  if (!cleanNewPass || cleanNewPass.length < 4) {
+    return { success: false, message: "Yeni şifre en az 4 karakter olmalıdır." };
+  }
+
+  if (cleanNewPass !== cleanConfirmPass) {
+    return { success: false, message: "Yeni şifreler birbiriyle uyuşmuyor." };
+  }
+
+  if (cleanNewPass === currentStored) {
+    return { success: false, message: "Yeni şifreniz eski şifrenizle aynı olamaz. Lütfen farklı bir şifre belirleyin." };
+  }
+
+  // Şifreyi güncelle ve Supabase / local sync tetikle
+  member.password = cleanNewPass;
+  saveStaff(staff);
+
+  // Aktif oturum bu kullanıcıysa currentUser nesnesini de güncelle
+  const activeUser = getCurrentUser();
+  if (activeUser && activeUser.id === staffId) {
+    setCurrentUser({
+      ...activeUser,
+      password: cleanNewPass,
+    });
+  }
+
+  // Denetim kaydı oluştur
+  addAuditLog({
+    userName: member.name,
+    userRole: member.role,
+    action: "Kullanıcı Kendi Şifresini Değiştirdi",
+    target: member.name,
+    category: "auth",
+    details: `Kullanıcı (@${member.username || member.email}) kendi hesap şifresini başarıyla güncelledi.`,
+  });
+
+  // Kullanıcıya bildirim gönder
+  addNotification({
+    to: member.id,
+    from: "system",
+    type: "system",
+    title: "Şifreniz Değiştirildi",
+    message: "Giriş şifreniz başarıyla güncellendi. Yeni şifreniz tüm sistemde aktif edilmiştir.",
+  });
+
+  notify();
+  return {
+    success: true,
+    message: "Şifreniz başarıyla değiştirildi! Yeni şifreniz kaydedildi.",
+  };
+}
+
 export function updateStaff(id: string, updates: Partial<StaffMember>): boolean {
   const staff = loadStaff();
   const idx = staff.findIndex((s) => s.id === id);
@@ -2442,6 +2525,58 @@ export function resetToDefaults() {
 
 export const CURRENT_USER_STORAGE_KEY = "bct_current_user";
 export const ACTIVE_ROLE_STORAGE_KEY = "bct_active_role";
+export const ADMIN_ORIGIN_STORAGE_KEY = "bct_admin_origin_user";
+
+export function getAdminOriginUser(): StaffMember | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(ADMIN_ORIGIN_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
+export function setAdminOriginUser(user: StaffMember | null) {
+  if (typeof window === "undefined") return;
+  if (!user) {
+    localStorage.removeItem(ADMIN_ORIGIN_STORAGE_KEY);
+  } else {
+    localStorage.setItem(ADMIN_ORIGIN_STORAGE_KEY, JSON.stringify(user));
+  }
+  notify();
+}
+
+/**
+ * Oturumun gerçekte bir Süper Admin tarafından açılıp açılmadığını veya
+ * şu an bir Admin'in başka bir rolü test/önizleme edip etmediğini kontrol eder.
+ */
+export function isRealAdminSession(): boolean {
+  if (typeof window === "undefined") return false;
+  const origin = getAdminOriginUser();
+  if (origin && (origin.role === "Süper Admin" || origin.id === "usr-gokhan" || origin.username === "gokhan")) {
+    return true;
+  }
+  const curr = getCurrentUser();
+  return Boolean(curr && (curr.role === "Süper Admin" || curr.id === "usr-gokhan" || curr.username === "gokhan"));
+}
+
+/**
+ * Admin önizleme modunu kapatıp kullanıcıyı Süper Admin kimliğine ve admin rolüne anında geri döndürür.
+ */
+export function exitAdminPreview(): StaffMember {
+  const origin = getAdminOriginUser();
+  const allStaff = loadStaff();
+  const superAdmin =
+    origin ||
+    allStaff.find((s) => s.id === "usr-gokhan" || s.role === "Süper Admin") ||
+    allStaff[0];
+
+  setAdminOriginUser(null);
+  setCurrentUser(superAdmin);
+  setActiveRole("admin");
+  notify();
+  return superAdmin;
+}
 
 export function getCurrentUser(): StaffMember | null {
   if (typeof window === "undefined") return null;

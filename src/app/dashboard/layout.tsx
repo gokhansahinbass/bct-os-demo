@@ -10,7 +10,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
-  const { canAccessPage, activeRole, activeRoleDef } = useStore();
+  const {
+    canAccessPage,
+    activeRole,
+    activeRoleDef,
+    currentUser,
+    isInPreviewMode,
+    isRealAdmin,
+    exitAdminPreview,
+  } = useStore();
 
   const [isOnline, setIsOnline] = useState(true);
   const [showReconnected, setShowReconnected] = useState(false);
@@ -71,6 +79,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
         <Header />
 
+        {/* ── Admin Rol Önizleme / Canlı Teftiş Modu Banner'ı ── */}
+        {isInPreviewMode && (
+          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white text-xs font-semibold px-5 py-2.5 flex items-center justify-between shadow-md z-30 shrink-0 border-b border-amber-500/50">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center text-sm font-bold shrink-0">
+                👁️
+              </div>
+              <div className="text-xs leading-tight">
+                <span className="font-bold uppercase tracking-wider text-amber-200">Admin Rol Önizleme / Teftiş:</span>
+                <span className="mx-2 text-amber-300">|</span>
+                <span>
+                  Şu anda <strong className="text-white">{activeRoleDef?.label}</strong> ({currentUser?.name}) rolünü canlı inceliyorsunuz.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                exitAdminPreview();
+                router.push("/dashboard/admin");
+              }}
+              className="bg-white hover:bg-amber-50 text-amber-900 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer shrink-0"
+              title="Önizlemeyi bitirip Süper Admin paneline dön"
+            >
+              <span>🛡️</span>
+              <span>Önizlemeyi Bitir ve Admin'e Dön</span>
+            </button>
+          </div>
+        )}
+
         {/* ── Offline-First Bilgilendirme Banner'ı ── */}
         {!isOnline && (
           <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between shadow-xs z-20 shrink-0">
@@ -122,6 +159,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span>←</span>
                     <span>Yetkili Çalışma Alanıma Dön</span>
                   </button>
+
+                  {(isInPreviewMode || isRealAdmin) && (
+                    <button
+                      onClick={() => {
+                        exitAdminPreview();
+                        router.push("/dashboard/admin");
+                      }}
+                      className="w-full mt-2.5 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-sm rounded-lg shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>🛡️</span>
+                      <span>Önizlemeyi Sonlandır ve Süper Admin'e Dön</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

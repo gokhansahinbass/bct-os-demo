@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useStore } from "@/lib/useStore";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 const navItems = [
   {
@@ -120,7 +122,15 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { canAccessPage, currentUser, activeRoleDef } = useStore();
+  const {
+    canAccessPage,
+    currentUser,
+    activeRoleDef,
+    isInPreviewMode,
+    exitAdminPreview,
+  } = useStore();
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Yalnızca rolün erişim yetkisi olan sayfaları menüde göster
   const allowedNavItems = navItems.filter((item) => canAccessPage(item.href));
@@ -165,8 +175,22 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* Bottom: User Profile Pill */}
+      {/* Bottom: User Profile Pill & Quick Actions */}
       <div className="p-3 border-t border-[#E2E8F0] space-y-2">
+        {isInPreviewMode && (
+          <button
+            onClick={() => {
+              exitAdminPreview();
+              window.location.href = "/dashboard/admin";
+            }}
+            className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            title="Önizlemeyi bitirip Süper Admin'e dön"
+          >
+            <span>🛡️</span>
+            <span>Admin'e Geri Dön</span>
+          </button>
+        )}
+
         <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200/80 hover:bg-slate-100/70 transition-colors">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-2xs">
@@ -181,20 +205,41 @@ export default function Sidebar() {
               </p>
             </div>
           </div>
-          <button
-            title="Güvenli Çıkış Yap"
-            className="text-slate-400 hover:text-red-600 p-1.5 rounded-md hover:bg-white transition-colors cursor-pointer"
-            onClick={() => {
-              document.cookie = "bct_auth=; path=/; max-age=0";
-              window.location.href = "/login";
-            }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
-          </button>
+
+          <div className="flex items-center gap-0.5">
+            {/* Şifremi Değiştir Butonu */}
+            <button
+              type="button"
+              title="Şifremi Değiştir"
+              className="text-slate-400 hover:text-blue-600 p-1.5 rounded-md hover:bg-white transition-colors cursor-pointer"
+              onClick={() => setShowPasswordModal(true)}
+            >
+              <span className="material-symbols-outlined text-[17px] block">vpn_key</span>
+            </button>
+
+            {/* Güvenli Çıkış */}
+            <button
+              title="Güvenli Çıkış Yap"
+              className="text-slate-400 hover:text-red-600 p-1.5 rounded-md hover:bg-white transition-colors cursor-pointer"
+              onClick={() => {
+                exitAdminPreview();
+                document.cookie = "bct_auth=; path=/; max-age=0";
+                window.location.href = "/login";
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* ── Şifre Değiştirme Modalı ── */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </aside>
   );
 }

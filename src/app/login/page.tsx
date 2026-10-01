@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStaff, setCurrentUser, setActiveRole, getRoles } from "@/lib/store";
+import { getStaff, setCurrentUser, setActiveRole, getRoles, setAdminOriginUser } from "@/lib/store";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -86,6 +86,7 @@ export default function LoginPage() {
 
         // Cookie & Session Yaz
         document.cookie = "bct_auth=granted; path=/; max-age=28800; SameSite=Lax";
+        setAdminOriginUser(null);
         setCurrentUser(activeStaff);
         setActiveRole(roleKey);
 

@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { useStore } from "@/lib/useStore";
-import { markNotificationRead, markAllNotificationsRead, deleteNotification } from "@/lib/store";
+import {
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  setAdminOriginUser,
+  getAdminOriginUser,
+} from "@/lib/store";
 import Link from "next/link";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 export default function Header() {
   const {
@@ -16,11 +23,33 @@ export default function Header() {
     currentUser,
     setCurrentUser,
     staff,
+    adminOriginUser,
+    isRealAdmin,
+    isInPreviewMode,
+    exitAdminPreview,
   } = useStore();
+
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   function handleRoleChange(newRole: string) {
+    if (newRole === "admin") {
+      exitAdminPreview();
+      return;
+    }
+
+    // Eğer henüz origin admin kaydedilmediyse mevcut admin oturumunu kaydet
+    const existingOrigin = adminOriginUser || getAdminOriginUser();
+    if (!existingOrigin) {
+      const adminStaff =
+        currentUser?.role === "Süper Admin" || currentUser?.id === "usr-gokhan"
+          ? currentUser
+          : staff.find((s) => s.id === "usr-gokhan" || s.role === "Süper Admin") || staff[0];
+      setAdminOriginUser(adminStaff);
+    }
+
     setActiveRole(newRole);
+
     if (newRole === "cagri_temsilci") {
       const rep = staff.find((s) => s.id === "usr-hakan") || staff.find((s) => s.role.includes("Çağrı"));
       if (rep) setCurrentUser(rep);
@@ -31,11 +60,11 @@ export default function Header() {
       const marketer = staff.find((s) => s.id === "usr-selin") || staff.find((s) => s.department?.includes("Pazarlama"));
       if (marketer) setCurrentUser(marketer);
     } else if (newRole === "kurgu") {
-      const editor = staff.find((s) => s.id === "usr-gokhan");
+      const editor = staff.find((s) => s.id === "usr-ahmet") || staff.find((s) => s.role.includes("Kurgu"));
       if (editor) setCurrentUser(editor);
-    } else if (newRole === "admin") {
-      const adminUser = staff.find((s) => s.id === "usr-gokhan") || staff[0];
-      if (adminUser) setCurrentUser(adminUser);
+    } else if (newRole === "dergi_tasarimci") {
+      const designer = staff.find((s) => s.role.includes("Dergi")) || staff.find((s) => s.department?.includes("Dergi"));
+      if (designer) setCurrentUser(designer);
     }
   }
 
@@ -83,23 +112,25 @@ export default function Header() {
           <span className="text-xs font-medium text-emerald-700">Canlı Sistem</span>
         </div>
 
-        {activeRole !== "admin" && (
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-            <span>👁️ Önizleme:</span>
-            <span>{activeRoleDef?.label}</span>
-            {currentUser && (
-              <span className="text-[10px] font-normal text-amber-800 ml-1">
-                ({currentUser.name})
-              </span>
-            )}
+        {isInPreviewMode && (
+          <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+            <span className="animate-pulse">👁️</span>
+            <span>Önizleme: <strong>{activeRoleDef?.label}</strong> ({currentUser?.name})</span>
+            <button
+              onClick={() => exitAdminPreview()}
+              className="ml-1 text-[10px] bg-amber-800 hover:bg-amber-950 text-white px-2 py-0.5 rounded-full transition cursor-pointer font-bold"
+              title="Önizlemeyi Sonlandır ve Admin'e Dön"
+            >
+              Kapat ✕
+            </button>
           </div>
         )}
       </div>
 
-      {/* Right: Role Switcher + Notification + Time */}
+      {/* Right: Role Switcher + Password Change + Notification + Time */}
       <div className="flex items-center gap-3">
-        {/* Interactive Role Switcher: SADECE Gerçek Süper Admin ise görünür, normal personel değiştiremez */}
-        {(currentUser?.role === "Süper Admin" || currentUser?.username === "gokhan" || currentUser?.id === "usr-gokhan") ? (
+        {/* Interactive Role Switcher: Gerçek Süper Admin ise VEYA Admin önizleme modundaysa HER ZAMAN görünür */}
+        {(isRealAdmin || currentUser?.role === "Süper Admin" || currentUser?.username === "gokhan" || currentUser?.id === "usr-gokhan" || Boolean(adminOriginUser)) ? (
           <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
             <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
               <span>🛡️</span> Rol:
@@ -165,13 +196,14 @@ export default function Header() {
               </div>
             )}
 
-            {activeRole !== "admin" && (
+            {(activeRole !== "admin" || isInPreviewMode) && (
               <button
-                onClick={() => handleRoleChange("admin")}
-                className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold hover:bg-red-200 cursor-pointer transition ml-1"
+                onClick={() => exitAdminPreview()}
+                className="text-[11px] bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded-lg font-bold shadow-xs transition flex items-center gap-1 cursor-pointer ml-1"
                 title="Süper Admin Moduna Dön"
               >
-                ✕ Admin'e Dön
+                <span>🛡️</span>
+                <span>Admin'e Dön</span>
               </button>
             )}
           </div>
@@ -180,6 +212,28 @@ export default function Header() {
             <span className="w-2 h-2 rounded-full bg-blue-600"></span>
             <span className="text-xs font-bold text-slate-700">{activeRoleDef?.label || "Yetkili Kullanıcı"}</span>
           </div>
+        )}
+
+        {/* Kullanıcı Profili & Şifre Değiştirme Butonu */}
+        {currentUser && (
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 text-slate-700 hover:text-blue-700 transition-colors cursor-pointer group shadow-2xs"
+            title="Giriş şifrenizi değiştirmek için tıklayın"
+          >
+            <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[10px] shadow-2xs">
+              {currentUser.avatar || currentUser.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="text-left hidden lg:block leading-tight">
+              <p className="text-xs font-bold text-slate-900 group-hover:text-blue-700 truncate max-w-[110px]">
+                {currentUser.name.split(" ")[0]}
+              </p>
+              <p className="text-[10px] text-slate-500 font-medium">Şifre Değiştir</p>
+            </div>
+            <span className="material-symbols-outlined text-[16px] text-slate-400 group-hover:text-blue-600 transition-colors ml-0.5">
+              vpn_key
+            </span>
+          </button>
         )}
         {/* Notification Bell */}
         <div className="relative">
@@ -288,6 +342,12 @@ export default function Header() {
           <span className="text-[11px] text-slate-500 capitalize">{dateStr}</span>
         </div>
       </div>
+
+      {/* ── Kullanıcı Şifre Değiştirme Modalı ── */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </header>
   );
 }

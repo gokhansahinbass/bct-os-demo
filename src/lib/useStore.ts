@@ -14,6 +14,11 @@ import {
   setCurrentUser as storeSetCurrentUser,
   getActiveRole,
   setActiveRole as storeSetActiveRole,
+  getAdminOriginUser,
+  setAdminOriginUser as storeSetAdminOriginUser,
+  isRealAdminSession,
+  exitAdminPreview as storeExitAdminPreview,
+  changeStaffPassword,
   hasRolePermission,
   canRoleAccessPath,
   canRoleAccessRoom,
@@ -29,6 +34,7 @@ import {
   type AuditLog,
   type Room,
   type RoleDefinition,
+  type PasswordChangeResult,
 } from "@/lib/store";
 import { setupSupabaseAutoSync } from "@/lib/supabase";
 
@@ -44,7 +50,9 @@ export function useStore() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
+  const [adminOriginUser, setLocalAdminOriginUser] = useState<StaffMember | null>(null);
   const [activeRole, setLocalActiveRole] = useState<string>("admin");
+  const [isRealAdmin, setIsRealAdmin] = useState<boolean>(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const refresh = useCallback(() => {
@@ -55,7 +63,9 @@ export function useStore() {
     setRooms(getRooms());
     setRoles(getRoles());
     setLocalCurrentUser(getCurrentUser());
+    setLocalAdminOriginUser(getAdminOriginUser());
     setLocalActiveRole(getActiveRole());
+    setIsRealAdmin(isRealAdminSession());
     setIsLoaded(true);
   }, []);
 
@@ -144,6 +154,29 @@ export function useStore() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const exitAdminPreview = useCallback(() => {
+    storeExitAdminPreview();
+    refresh();
+  }, [refresh]);
+
+  const changePassword = useCallback(
+    (currentPass: string, newPass: string, confirmPass: string): PasswordChangeResult => {
+      if (!currentUser) {
+        return { success: false, message: "Aktif kullanıcı oturumu bulunamadı." };
+      }
+      const res = changeStaffPassword(currentUser.id, currentPass, newPass, confirmPass);
+      if (res.success) {
+        refresh();
+      }
+      return res;
+    },
+    [currentUser, refresh]
+  );
+
+  const isInPreviewMode = useMemo(() => {
+    return Boolean(adminOriginUser && activeRole !== "admin");
+  }, [adminOriginUser, activeRole]);
+
   return {
     guests,
     staff,
@@ -158,6 +191,11 @@ export function useStore() {
     activeRoleDef,
     setActiveRole,
     setCurrentUser,
+    adminOriginUser,
+    isRealAdmin,
+    isInPreviewMode,
+    exitAdminPreview,
+    changePassword,
     hasPermission,
     canAccessPage,
     canAccessRoom,
