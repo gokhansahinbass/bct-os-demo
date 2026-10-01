@@ -4,13 +4,16 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import { addNotification } from "@/lib/store";
+import { exportFinancialSummaryToCSV, exportGuestsToCSV, printCurrentPageReport } from "@/lib/exportUtils";
 
 export default function YonetimPage() {
-  const { guests, staff, rooms, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
+  const { guests, staff, rooms, auditLogs, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
   const [dispatchState, setDispatchState] = useState<"idle" | "loading" | "done">("idle");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
   const [showCompetitionModal, setShowCompetitionModal] = useState(false);
+  const [auditCategory, setAuditCategory] = useState<string>("all");
+  const [auditSearch, setAuditSearch] = useState<string>("");
 
   function handleDispatch() {
     setDispatchState("loading");
@@ -221,10 +224,24 @@ export default function YonetimPage() {
               Stüdyo Genel Müdürlüğü — Satış, montaj analitiği ve odalar arası rekabet ligi
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => exportFinancialSummaryToCSV(rankedRooms)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition"
+              title="Oda bazlı ciro ve performans verilerini Excel formatında indir"
+            >
+              <span>📥</span> Ciro Raporu (Excel)
+            </button>
+            <button
+              onClick={printCurrentPageReport}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-300 shadow-xs cursor-pointer transition"
+              title="Kokpit özetini yazdır veya PDF olarak kaydet"
+            >
+              <span>🖨️</span> PDF / Yazdır
+            </button>
             <button
               onClick={() => setShowCompetitionModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold shadow-xs cursor-pointer transition"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold shadow-xs cursor-pointer transition"
             >
               <span>🏆</span> Odalar Arası Rekabet Analiz Tablosu
             </button>
@@ -642,6 +659,116 @@ export default function YonetimPage() {
                 {inEditingCount} video kurguda işleniyor, {inReviewCount} video ise izleme onay masasında revize/sevk için bekliyor.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* ═════════════════════════════════════════════════ */}
+        {/* 4. AKTİVİTE GÜNLÜĞÜ & DENETİM İZİ (AUDIT TRAIL) */}
+        {/* ═════════════════════════════════════════════════ */}
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">Aktivite Günlüğü &amp; Denetim İzi (Audit Trail)</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                  {auditLogs.length} Kayıt
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Kim, ne zaman, hangi işlemi gerçekleştirdi? (Randevu, dergi, ek hizmet, şifre ve yetki geçmişi)
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                placeholder="Personel veya hedef ara..."
+                value={auditSearch}
+                onChange={(e) => setAuditSearch(e.target.value)}
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+
+              <select
+                value={auditCategory}
+                onChange={(e) => setAuditCategory(e.target.value)}
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
+              >
+                <option value="all">Tüm Kategoriler</option>
+                <option value="guest">Konuk &amp; Randevu</option>
+                <option value="dergi">Dergi Masası</option>
+                <option value="ek_hizmet">Ek Hizmetler</option>
+                <option value="kurgu">Kurgu &amp; Revize</option>
+                <option value="system">Sistem &amp; Yetki</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <th className="p-3">Zaman</th>
+                  <th className="p-3">Kullanıcı &amp; Rol</th>
+                  <th className="p-3">İşlem</th>
+                  <th className="p-3">İşlem Hedefi</th>
+                  <th className="p-3">Detaylar</th>
+                  <th className="p-3 text-right">Kategori</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {auditLogs
+                  .filter((log) => {
+                    if (auditCategory !== "all" && log.category !== auditCategory) return false;
+                    if (auditSearch.trim()) {
+                      const q = auditSearch.toLowerCase();
+                      return (
+                        log.userName.toLowerCase().includes(q) ||
+                        log.target.toLowerCase().includes(q) ||
+                        log.action.toLowerCase().includes(q)
+                      );
+                    }
+                    return true;
+                  })
+                  .slice(0, 15)
+                  .map((log) => {
+                    const badgeClass =
+                      log.category === "dergi"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : log.category === "ek_hizmet"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : log.category === "kurgu"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : log.category === "system"
+                        ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200";
+
+                    return (
+                      <tr key={log.id} className="hover:bg-slate-50 transition">
+                        <td className="p-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                          {new Date(log.timestamp).toLocaleString("tr-TR", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                        <td className="p-3">
+                          <p className="font-bold text-slate-900">{log.userName}</p>
+                          <p className="text-[10px] text-slate-400">{log.userRole}</p>
+                        </td>
+                        <td className="p-3 font-semibold text-slate-800">{log.action}</td>
+                        <td className="p-3 text-slate-700 truncate max-w-xs">{log.target}</td>
+                        <td className="p-3 text-slate-500 italic max-w-sm truncate">{log.details || "-"}</td>
+                        <td className="p-3 text-right">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${badgeClass}`}>
+                            {log.category}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
         </section>
       </div>

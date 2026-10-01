@@ -81,14 +81,27 @@ export interface SocialMedia {
 
 export interface Notification {
   id: string;
-  to: string;        // staff ID veya "all"
-  from: string;      // staff ID veya "system"
-  type: "task" | "info" | "warning";
+  to: string;        // staff ID, role key ("pazarlama", "kurgu", "admin") veya "all"
+  from: string;      // staff ID veya "system" | "kiosk" | "dergi" | "ek_hizmetler"
+  type: "task" | "info" | "warning" | "guest_arrived" | "system" | "revision";
   title: string;
   message: string;
   read: boolean;
   link?: string;     // opsiyonel yönlendirme linki
   createdAt: string;
+}
+
+// ── Aktivite Günlüğü & Denetim İzi (Audit Trail) ──
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  target: string;
+  details?: string;
+  category: "guest" | "dergi" | "ek_hizmet" | "kurgu" | "auth" | "system";
 }
 
 // ── Revize Notları ──
@@ -1339,15 +1352,88 @@ const DEFAULT_NOTIFICATIONS: Notification[] = [
   },
 ];
 
+// ── Varsayılan Aktivite Günlükleri (Audit Trail) ──
+
+const DEFAULT_AUDIT_LOGS: AuditLog[] = [
+  {
+    id: "log-1",
+    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    userName: "İrem Yıldız",
+    userRole: "Dergi Tasarımcısı",
+    action: "İçerik Durumu Güncellendi",
+    target: "Ahmet Yılmaz (Tekno A.Ş.)",
+    details: "Ön kapak ve 2 sayfa röportaj baskı onayına sunuldu.",
+    category: "dergi",
+  },
+  {
+    id: "log-2",
+    timestamp: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    userName: "Selin Demir",
+    userRole: "Ek Hizmetler Sorumlusu",
+    action: "Ek Hizmet Tamamlandı",
+    target: "Mehmet Kaya (Kaya İnşaat)",
+    details: "15 Haber Sitesi bülten dağıtımı tamamlandı ve linkler eklendi.",
+    category: "ek_hizmet",
+  },
+  {
+    id: "log-3",
+    timestamp: new Date(Date.now() - 1000 * 60 * 70).toISOString(),
+    userName: "Kiosk Terminal",
+    userRole: "Karşılama",
+    action: "Konuk Giriş Yaptı (Geldi)",
+    target: "Burak Yılmaz (Genç Girişimciler)",
+    details: "Stüdyoya giriş yaptı, Pazarlama ve Çağrı Şefine otomatik bildirim gönderildi.",
+    category: "guest",
+  },
+  {
+    id: "log-4",
+    timestamp: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
+    userName: "Gökhan",
+    userRole: "Kurgucu",
+    action: "Kurgu Tamamlandı",
+    target: "Seda Aksoy (Aksoy Mimarlık)",
+    details: "Master video render alındı, İzleme Masasına gönderildi.",
+    category: "kurgu",
+  },
+  {
+    id: "log-5",
+    timestamp: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
+    userName: "Süper Admin",
+    userRole: "Yönetici",
+    action: "Sistem Yetki Güncellemesi",
+    target: "Dergi Tasarımcısı & Ek Hizmetler",
+    details: "Rol yetkileri ve canlı Supabase veri senkronizasyonu devrede.",
+    category: "system",
+  },
+];
+
 // ── Storage Keys ──
 
 const GUESTS_STORAGE_KEY = "bct_os_guests";
 const STAFF_STORAGE_KEY = "bct_os_staff";
 const NOTIFICATIONS_STORAGE_KEY = "bct_os_notifications";
+const AUDIT_LOGS_STORAGE_KEY = "bct_os_audit_logs";
 const ROOMS_STORAGE_KEY = "bct_os_rooms";
 const ROLES_STORAGE_KEY = "bct_os_roles";
 
 // ── Load / Save Helpers ──
+
+function loadAuditLogs(): AuditLog[] {
+  if (typeof window === "undefined") return DEFAULT_AUDIT_LOGS;
+  try {
+    const stored = localStorage.getItem(AUDIT_LOGS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return DEFAULT_AUDIT_LOGS;
+}
+
+function saveAuditLogs(logs: AuditLog[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(AUDIT_LOGS_STORAGE_KEY, JSON.stringify(logs));
+}
 
 function loadGuests(): Guest[] {
   if (typeof window === "undefined") return DEFAULT_GUESTS;
@@ -1736,10 +1822,30 @@ export function cancelGuestAppointment(guestId: string, reason?: string) {
   const guests = loadGuests();
   const idx = guests.findIndex((g) => g.id === guestId);
   if (idx === -1) return;
-  guests[idx].status = "cancelled";
-  guests[idx].cancelledReason = reason || "Konuk talebi ile randevu iptal edildi.";
-  guests[idx].cancelledAt = new Date().toLocaleString("tr-TR");
+  const guest = guests[idx];
+  guest.status = "cancelled";
+  guest.cancelledReason = reason || "Konuk talebi ile randevu iptal edildi.";
+  guest.cancelledAt = new Date().toLocaleString("tr-TR");
   saveGuests(guests);
+
+  addNotification({
+    to: "all",
+    from: "system",
+    type: "warning",
+    title: "Randevu İptali",
+    message: `${guest.name} (${guest.company}) randevusunu iptal etti. Gerekçe: ${guest.cancelledReason}`,
+    link: "/dashboard/cagri-merkezi",
+  });
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Çağrı Temsilcisi",
+    userRole: getCurrentUser()?.role || "Operasyon",
+    action: "Randevu İptal Edildi",
+    target: `${guest.name} (${guest.company})`,
+    details: `Gerekçe: ${guest.cancelledReason}`,
+    category: "guest",
+  });
+
   notify();
 }
 
@@ -1747,10 +1853,20 @@ export function restoreGuestAppointment(guestId: string) {
   const guests = loadGuests();
   const idx = guests.findIndex((g) => g.id === guestId);
   if (idx === -1) return;
-  guests[idx].status = "appointment_set";
-  guests[idx].cancelledReason = undefined;
-  guests[idx].cancelledAt = undefined;
+  const guest = guests[idx];
+  guest.status = "appointment_set";
+  guest.cancelledReason = undefined;
+  guest.cancelledAt = undefined;
   saveGuests(guests);
+
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Sistem",
+    userRole: getCurrentUser()?.role || "Operasyon",
+    action: "İptal Geri Alındı / Randevu Aktif",
+    target: `${guest.name} (${guest.company})`,
+    category: "guest",
+  });
+
   notify();
 }
 
@@ -1758,8 +1874,38 @@ export function markGuestArrived(guestId: string) {
   const guests = loadGuests();
   const idx = guests.findIndex((g) => g.id === guestId);
   if (idx === -1) return;
-  guests[idx].status = "kiosk_registered";
+  const guest = guests[idx];
+  guest.status = "kiosk_registered";
   saveGuests(guests);
+
+  // Otomatik Bildirim Tetikleyicileri (Pazarlama & Çağrı Şefi)
+  addNotification({
+    to: "pazarlama",
+    from: "kiosk",
+    type: "guest_arrived",
+    title: "Konuk Stüdyoya Geldi",
+    message: `${guest.name} (${guest.company}) stüdyoya giriş yaptı. Pazarlama odasına davet edildi.`,
+    link: "/dashboard/pazarlama",
+  });
+  addNotification({
+    to: "cagri_sefi",
+    from: "kiosk",
+    type: "guest_arrived",
+    title: "Randevulu Konuk Karşılandı",
+    message: `${guest.representative || "Temsilci"} tarafından davet edilen ${guest.name} (${guest.company}) stüdyoda.`,
+    link: "/dashboard/cagri-merkezi",
+  });
+
+  // Aktivite Günlüğü (Audit Trail)
+  addAuditLog({
+    userName: getCurrentUser()?.name || "Kiosk Terminali",
+    userRole: getCurrentUser()?.role || "Giriş Karşılama",
+    action: "Konuk Giriş Yaptı (Geldi)",
+    target: `${guest.name} (${guest.company})`,
+    details: `Kayıt No: ${guest.registrationNo || "#BCT"} - Temsilci: ${guest.representative || "Bilinmiyor"}`,
+    category: "guest",
+  });
+
   notify();
 }
 
@@ -1829,14 +1975,47 @@ export function updateMagazineStatus(
   if (!guest) return;
   const svc = guest.services.find((s) => s.id === serviceId);
   if (!svc) return;
+  const prevStatus = svc.magazineStatus || "icerik_bekleniyor";
   svc.magazineStatus = status;
+
   if (status === "tamamlandi") {
     svc.completedAt = new Date().toLocaleString("tr-TR");
-    svc.completedBy = completedBy || "Dergi Editörü";
+    svc.completedBy = completedBy || getCurrentUser()?.name || "Dergi Editörü";
+
+    addNotification({
+      to: "admin",
+      from: "dergi",
+      type: "system",
+      title: "Dergi Tasarımı Tamamlandı",
+      message: `${guest.name} (${guest.company}) için dergi tasarımı tamamlandı ve baskıya hazır.`,
+      link: "/dashboard/dergi",
+    });
+  } else if (status === "icerik_geldi") {
+    svc.completedAt = undefined;
+    svc.completedBy = undefined;
+
+    addNotification({
+      to: "dergi_tasarimci",
+      from: "system",
+      type: "info",
+      title: "Yeni Dergi İçeriği Yüklendi",
+      message: `${guest.name} (${guest.company}) için içerik belgeleri sisteme eklendi.`,
+      link: "/dashboard/dergi",
+    });
   } else {
     svc.completedAt = undefined;
     svc.completedBy = undefined;
   }
+
+  addAuditLog({
+    userName: completedBy || getCurrentUser()?.name || "Dergi Editörü",
+    userRole: getCurrentUser()?.role || "Dergi Masası",
+    action: `Dergi Durumu Değişti: ${status}`,
+    target: `${guest.name} (${guest.company})`,
+    details: `${prevStatus} → ${status}`,
+    category: "dergi",
+  });
+
   saveGuests(guests);
   notify();
 }
@@ -1872,6 +2051,25 @@ export function addMagazineFile(
   if (!svc.magazineStatus || svc.magazineStatus === "icerik_bekleniyor") {
     svc.magazineStatus = "icerik_geldi";
   }
+
+  addAuditLog({
+    userName: file.uploadedBy || getCurrentUser()?.name || "Kullanıcı",
+    userRole: getCurrentUser()?.role || "Dergi Masası",
+    action: "Dergi Dosyası Yüklendi",
+    target: `${guest.name} — ${file.name}`,
+    details: `Tür: ${file.type} | Boyut: ${(file.size / 1024).toFixed(1)} KB`,
+    category: "dergi",
+  });
+
+  addNotification({
+    to: "dergi_tasarimci",
+    from: "system",
+    type: "info",
+    title: "Yeni Dosya Yüklendi",
+    message: `${guest.name} için "${file.name}" yüklendi.`,
+    link: "/dashboard/dergi",
+  });
+
   saveGuests(guests);
   notify();
   return newFile;
@@ -1883,7 +2081,19 @@ export function deleteMagazineFile(guestId: string, serviceId: string, fileId: s
   if (!guest) return;
   const svc = guest.services.find((s) => s.id === serviceId);
   if (!svc || !svc.magazineFiles) return;
+  const deletedFile = svc.magazineFiles.find((f) => f.id === fileId);
   svc.magazineFiles = svc.magazineFiles.filter((f) => f.id !== fileId);
+
+  if (deletedFile) {
+    addAuditLog({
+      userName: getCurrentUser()?.name || "Kullanıcı",
+      userRole: getCurrentUser()?.role || "Dergi Masası",
+      action: "Dergi Dosyası Silindi",
+      target: `${guest.name} — ${deletedFile.name}`,
+      category: "dergi",
+    });
+  }
+
   saveGuests(guests);
   notify();
 }
@@ -1929,7 +2139,25 @@ export function toggleExtraServiceStatus(
   } else {
     detail.status = "tamamlandi";
     detail.completedAt = new Date().toLocaleString("tr-TR");
-    detail.completedBy = completedBy || "Operasyon";
+    detail.completedBy = completedBy || getCurrentUser()?.name || "Operasyon";
+
+    addNotification({
+      to: "admin",
+      from: "ek_hizmetler",
+      type: "system",
+      title: "Ek Hizmet Tamamlandı",
+      message: `${guest.name} için "${detail.label}" tamamlandı.`,
+      link: "/dashboard/ek-hizmetler",
+    });
+
+    addAuditLog({
+      userName: detail.completedBy,
+      userRole: getCurrentUser()?.role || "Operasyon",
+      action: "Ek Hizmet Tamamlandı",
+      target: `${guest.name} (${guest.company}) — ${detail.label}`,
+      details: detail.link ? `Link: ${detail.link}` : "İşlem yapıldı olarak kaydedildi",
+      category: "ek_hizmet",
+    });
   }
   saveGuests(guests);
   notify();
@@ -1941,11 +2169,31 @@ export function addNoteToGuest(guestId: string, note: Omit<RevisionNote, "id" | 
   const guests = loadGuests();
   const idx = guests.findIndex((g) => g.id === guestId);
   if (idx === -1) return;
-  guests[idx].notes.unshift({
+  const guest = guests[idx];
+  guest.notes.unshift({
     ...note,
     id: "note-" + Date.now(),
     createdAt: new Date().toISOString(),
   });
+
+  addNotification({
+    to: "kurgu",
+    from: "izleme",
+    type: "revision",
+    title: "Yeni Revize Notu",
+    message: `${guest.name} videosuna yeni revize notu eklendi: "${note.text.slice(0, 40)}..."`,
+    link: "/dashboard/revize",
+  });
+
+  addAuditLog({
+    userName: note.author,
+    userRole: note.authorType === "client" ? "Konuk Müşteri" : "İzleme Masası",
+    action: "Revize Notu Eklendi",
+    target: `${guest.name} (${guest.company})`,
+    details: `Zaman Kodu: ${note.time} — "${note.text.slice(0, 50)}"`,
+    category: "kurgu",
+  });
+
   saveGuests(guests);
   notify();
 }
@@ -2087,6 +2335,33 @@ export function markAllNotificationsRead() {
 export function deleteNotification(id: string) {
   const notifications = loadNotifications().filter((n) => n.id !== id);
   saveNotifications(notifications);
+  notify();
+}
+
+// ══════════════════════════════════
+// ── Public Audit Logs API ──
+// ══════════════════════════════════
+
+export function getAuditLogs(): AuditLog[] {
+  return loadAuditLogs();
+}
+
+export function addAuditLog(log: Omit<AuditLog, "id" | "timestamp">): AuditLog {
+  const logs = loadAuditLogs();
+  const newLog: AuditLog = {
+    ...log,
+    id: "log-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+    timestamp: new Date().toISOString(),
+  };
+  logs.unshift(newLog);
+  if (logs.length > 250) logs.pop();
+  saveAuditLogs(logs);
+  notify();
+  return newLog;
+}
+
+export function clearAuditLogs() {
+  saveAuditLogs([]);
   notify();
 }
 

@@ -12,6 +12,7 @@ import {
   type Guest,
   type Service,
 } from "@/lib/store";
+import { exportMagazineOrdersToCSV } from "@/lib/exportUtils";
 
 const STATUS_CONFIG: Record<
   MagazineStatus,
@@ -66,6 +67,8 @@ export default function DergiPage() {
     guestId: string;
     serviceId: string;
   } | null>(null);
+  const [previewModal, setPreviewModal] = useState<MagazineFile | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Dergi hizmeti satın almış konukları listele
   const magazineOrders = useMemo(() => {
@@ -127,43 +130,64 @@ export default function DergiPage() {
     return { total, bekleyen, geldi, tasarimda, bitti };
   }, [magazineOrders]);
 
-  // Dosya Yükleme İşlemi (Görsel veya Metin)
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  // Dosya Yükleme İşlemi (API / Bulut & Yerel Fallback)
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0 || !activeUploadTarget) return;
 
     const file = files[0];
-    const reader = new FileReader();
+    setIsUploading(true);
 
-    reader.onload = (uploadEvent) => {
-      const dataUrl = uploadEvent.target?.result as string;
-      let fileType = "other";
-      if (file.type.startsWith("image/")) fileType = "image";
-      else if (file.type === "application/pdf") fileType = "pdf";
-      else if (
-        file.type.includes("word") ||
-        file.type.includes("text") ||
-        file.name.endsWith(".doc") ||
-        file.name.endsWith(".docx")
-      ) {
-        fileType = "doc";
-      }
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("guestId", activeUploadTarget.guestId);
+      formData.append("serviceId", activeUploadTarget.serviceId);
 
-      addMagazineFile(activeUploadTarget.guestId, activeUploadTarget.serviceId, {
-        name: file.name,
-        size: file.size,
-        type: fileType,
-        dataUrl,
-        uploadedBy: currentUser?.name || "Dergi Sorumlusu",
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
 
-      setFeedback(`✓ "${file.name}" başarıyla yüklendi.`);
+      if (res.ok) {
+        const json = await res.json();
+        addMagazineFile(activeUploadTarget.guestId, activeUploadTarget.serviceId, {
+          name: json.name || file.name,
+          size: json.size || file.size,
+          type: json.type || (file.type.startsWith("image/") ? "image" : file.type.includes("pdf") ? "pdf" : "doc"),
+          dataUrl: json.url,
+          uploadedBy: currentUser?.name || "Dergi Sorumlusu",
+        });
+        setFeedback(`✓ "${file.name}" yüklendi ve arşivlendi.`);
+      } else {
+        throw new Error("Upload API hatası");
+      }
+    } catch {
+      // Yerel DataURL fallback
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const dataUrl = uploadEvent.target?.result as string;
+        let fileType = "other";
+        if (file.type.startsWith("image/")) fileType = "image";
+        else if (file.type === "application/pdf") fileType = "pdf";
+        else fileType = "doc";
+
+        addMagazineFile(activeUploadTarget.guestId, activeUploadTarget.serviceId, {
+          name: file.name,
+          size: file.size,
+          type: fileType,
+          dataUrl,
+          uploadedBy: currentUser?.name || "Dergi Sorumlusu",
+        });
+        setFeedback(`✓ "${file.name}" başarıyla yüklendi.`);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
       setTimeout(() => setFeedback(null), 4000);
       setActiveUploadTarget(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-
-    reader.readAsDataURL(file);
+    }
   }
 
   function handleStatusChange(guestId: string, serviceId: string, newStatus: MagazineStatus) {
@@ -226,7 +250,14 @@ export default function DergiPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+          <button
+            onClick={() => exportMagazineOrdersToCSV(magazineOrders)}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>📥</span>
+            <span>Excel'e Aktar (CSV)</span>
+          </button>
+          <span className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
             Sorumlu: {currentUser?.name || "Dergi Editörü"}
           </span>
         </div>
@@ -569,6 +600,19 @@ export default function DergiPage() {
 
                             <div className="flex items-center gap-1 shrink-0">
                               {file.dataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewModal(file)}
+                                  className="p-1 text-slate-600 hover:text-blue-600 rounded hover:bg-white cursor-pointer"
+                                  title="Önizle"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                </button>
+                              )}
+                              {file.dataUrl && (
                                 <a
                                   href={file.dataUrl}
                                   download={file.name}
@@ -599,6 +643,79 @@ export default function DergiPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Dosya Önizleme / Işık Kutusu Modalı (Lightbox) ── */}
+      {previewModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">
+                  {previewModal.type === "image" ? "🖼️" : previewModal.type === "pdf" ? "📕" : "📄"}
+                </span>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">{previewModal.name}</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {formatBytes(previewModal.size)} • {previewModal.uploadedAt}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {previewModal.dataUrl && (
+                  <a
+                    href={previewModal.dataUrl}
+                    download={previewModal.name}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <span>İndir</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewModal(null)}
+                  className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center font-bold text-sm cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex items-center justify-center bg-slate-900/5 min-h-[300px]">
+              {previewModal.type === "image" && previewModal.dataUrl ? (
+                <img
+                  src={previewModal.dataUrl}
+                  alt={previewModal.name}
+                  className="max-h-[60vh] max-w-full rounded-xl object-contain shadow-sm"
+                />
+              ) : (
+                <div className="text-center p-8">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 text-3xl">
+                    📄
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm mb-1">{previewModal.name}</h4>
+                  <p className="text-xs text-slate-500 mb-4">Bu belge türü indirilerek incelenebilir.</p>
+                  {previewModal.dataUrl && (
+                    <a
+                      href={previewModal.dataUrl}
+                      download={previewModal.name}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition"
+                    >
+                      <span>📥</span>
+                      <span>Belgeyi Bilgisayara İndir</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

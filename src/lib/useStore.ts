@@ -7,6 +7,9 @@ import {
   getNotifications,
   getRooms,
   getRoles,
+  getAuditLogs,
+  addAuditLog,
+  clearAuditLogs,
   getCurrentUser,
   setCurrentUser as storeSetCurrentUser,
   getActiveRole,
@@ -23,6 +26,7 @@ import {
   type GuestStatus,
   type StaffMember,
   type Notification,
+  type AuditLog,
   type Room,
   type RoleDefinition,
 } from "@/lib/store";
@@ -36,6 +40,7 @@ export function useStore() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
@@ -46,6 +51,7 @@ export function useStore() {
     setGuests(getGuests());
     setStaff(getStaff());
     setNotifications(getNotifications());
+    setAuditLogs(getAuditLogs());
     setRooms(getRooms());
     setRoles(getRoles());
     setLocalCurrentUser(getCurrentUser());
@@ -142,6 +148,9 @@ export function useStore() {
     guests,
     staff,
     notifications,
+    auditLogs,
+    addAuditLog,
+    clearAuditLogs,
     rooms,
     roles,
     currentUser,

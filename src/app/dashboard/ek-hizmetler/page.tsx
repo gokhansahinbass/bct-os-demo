@@ -10,6 +10,7 @@ import {
   type ServiceDetail,
   type ServiceType,
 } from "@/lib/store";
+import { exportExtraServicesToCSV } from "@/lib/exportUtils";
 
 interface ExtraTask {
   id: string;
@@ -190,7 +191,34 @@ export default function EkHizmetlerPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+          <button
+            onClick={() => {
+              const items = allTasks.map((t) => ({
+                guest: {
+                  id: t.guestId,
+                  registrationNo: t.id.split("-")[0],
+                  name: t.guestName,
+                  company: t.company,
+                  phone: t.phone,
+                } as any,
+                service: { type: t.serviceType },
+                detail: {
+                  label: t.label,
+                  status: t.status,
+                  completedAt: t.completedAt,
+                  completedBy: t.completedBy,
+                  link: t.link,
+                  note: t.note,
+                },
+              }));
+              exportExtraServicesToCSV(items);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>📥</span>
+            <span>Excel'e Aktar (CSV)</span>
+          </button>
+          <span className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
             Kullanıcı: {currentUser?.name || "Operasyon"}
           </span>
         </div>
