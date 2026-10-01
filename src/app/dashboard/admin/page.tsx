@@ -903,13 +903,14 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>Supabase (PostgreSQL) Prodüksiyon Senkronizasyonu</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/30 text-blue-200 border border-blue-400/40">
-                        50+ KULLANICI HAZIR
+                      <span>Supabase (PostgreSQL) Canlı Bulut Senkronizasyonu</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        TAM OTOMATİK &amp; CANLI (REALTIME)
                       </span>
                     </h3>
-                    <p className="text-xs text-slate-300 mt-0.5">
-                      Farklı cihazlardan (telefon, tablet, bilgisayar) bağlanan tüm ekiplerin aynı canlı veritabanında çalışmasını sağlar.
+                    <p className="text-xs text-slate-300 mt-1">
+                      Herhangi bir personel konuk eklediğinde, durum güncellediğinde veya dergi içeriği yüklediğinde veriler <strong>anında otomatik olarak Supabase'e yazılır</strong> ve tüm cihazlara (50+ çalışan) canlı olarak iletilir. Yöneticinin işlem yapması gerekmez.
                     </p>
                   </div>
                 </div>
@@ -925,7 +926,8 @@ export default function AdminPage() {
                   <button
                     disabled={syncLoading}
                     onClick={handleSyncToSupabase}
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 disabled:bg-blue-800"
+                    title="Normalde sistem tam otomatiktir. Bu buton sadece acil durumda veya sıfırdan zorla buluta basmak istediğinizde kullanılır."
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 disabled:bg-blue-800"
                   >
                     {syncLoading ? (
                       <>
@@ -935,7 +937,7 @@ export default function AdminPage() {
                     ) : (
                       <>
                         <span>⚡</span>
-                        <span>Tüm Verileri Supabase'e Aktar</span>
+                        <span>Zorla Yeniden Eşitle (Manuel)</span>
                       </>
                     )}
                   </button>
@@ -945,15 +947,15 @@ export default function AdminPage() {
               <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300">
                 <div className="flex items-center gap-2">
                   <span className="text-emerald-400">✓</span>
-                  <span>Şema: <code>supabase/schema.sql</code> hazır</span>
+                  <span>Otomatik İlk Tohumlama (Auto-Seed)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-emerald-400">✓</span>
-                  <span>Otomatik RLS Güvenlik Kuralları</span>
+                  <span>Canlı Çift Yönlü Dinleme (Realtime)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-emerald-400">✓</span>
-                  <span>API Uç Noktaları: <code>/api/guests</code> &amp; <code>/api/staff</code></span>
+                  <span>API: <code>/api/guests</code> &amp; <code>/api/staff</code></span>
                 </div>
               </div>
             </div>

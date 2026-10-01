@@ -1394,9 +1394,122 @@ function loadGuests(): Guest[] {
   return DEFAULT_GUESTS;
 }
 
+// ── Supabase Arka Plan Otomatik Senkronizasyon Bayrağı & Zamanlayıcıları ──
+let isRemoteSyncInProgress = false;
+let guestCloudSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let staffCloudSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleCloudGuestSync(guestsList: Guest[]) {
+  if (typeof window === "undefined" || isRemoteSyncInProgress) return;
+  if (guestCloudSyncTimer) clearTimeout(guestCloudSyncTimer);
+  guestCloudSyncTimer = setTimeout(async () => {
+    try {
+      const { isSupabaseConfigured, getSupabaseClient } = await import("./supabase");
+      if (!isSupabaseConfigured) return;
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const payload = guestsList.map((g) => ({
+        id: g.id,
+        name: g.name,
+        company: g.company,
+        title: g.title,
+        phone: g.phone,
+        instagram: g.instagram,
+        website: g.website,
+        show_ig: g.showIg,
+        show_web: g.showWeb,
+        vip: g.vip,
+        status: g.status,
+        representative: g.representative,
+        appointment_date: g.appointmentDate,
+        appointment_time: g.appointmentTime,
+        shoot_time: g.shootTime,
+        shoot_duration: g.shootDuration,
+        studio: g.studio,
+        editor: g.editor,
+        amount: g.amount,
+        payment_status: g.paymentStatus,
+        on_odeme_miktari: g.onOdemeMiktari,
+        registration_no: g.registrationNo,
+        room: g.room,
+        marketer: g.marketer,
+        cancelled_reason: g.cancelledReason,
+        cancelled_at: g.cancelledAt,
+        services: g.services,
+        social_media: g.socialMedia,
+        notes: g.notes,
+        updated_at: new Date().toISOString(),
+      }));
+
+      await client.from("guests").upsert(payload);
+    } catch (err) {
+      console.warn("[BCT-OS] Arka plan bulut konuk senkronizasyonu:", err);
+    }
+  }, 400);
+}
+
+function scheduleCloudStaffSync(staffList: StaffMember[]) {
+  if (typeof window === "undefined" || isRemoteSyncInProgress) return;
+  if (staffCloudSyncTimer) clearTimeout(staffCloudSyncTimer);
+  staffCloudSyncTimer = setTimeout(async () => {
+    try {
+      const { isSupabaseConfigured, getSupabaseClient } = await import("./supabase");
+      if (!isSupabaseConfigured) return;
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const payload = staffList.map((s) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        username: s.username,
+        password_hash: s.password,
+        role: s.role,
+        department: s.department,
+        status: s.status,
+        avatar: s.avatar,
+        room: s.room || null,
+        is_leader: Boolean(s.isLeader),
+      }));
+
+      await client.from("staff").upsert(payload);
+    } catch (err) {
+      console.warn("[BCT-OS] Arka plan bulut personel senkronizasyonu:", err);
+    }
+  }, 400);
+}
+
+export function applyRemoteGuests(remoteGuests: Guest[]) {
+  if (typeof window === "undefined" || !Array.isArray(remoteGuests) || remoteGuests.length === 0) return;
+  try {
+    isRemoteSyncInProgress = true;
+    localStorage.setItem(GUESTS_STORAGE_KEY, JSON.stringify(remoteGuests));
+    notify();
+  } finally {
+    setTimeout(() => {
+      isRemoteSyncInProgress = false;
+    }, 500);
+  }
+}
+
+export function applyRemoteStaff(remoteStaff: StaffMember[]) {
+  if (typeof window === "undefined" || !Array.isArray(remoteStaff) || remoteStaff.length === 0) return;
+  try {
+    isRemoteSyncInProgress = true;
+    localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(remoteStaff));
+    notify();
+  } finally {
+    setTimeout(() => {
+      isRemoteSyncInProgress = false;
+    }, 500);
+  }
+}
+
 function saveGuests(guests: Guest[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(GUESTS_STORAGE_KEY, JSON.stringify(guests));
+  scheduleCloudGuestSync(guests);
 }
 
 function loadRoles(): RoleDefinition[] {
@@ -1473,6 +1586,7 @@ function loadStaff(): StaffMember[] {
 function saveStaff(staff: StaffMember[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staff));
+  scheduleCloudStaffSync(staff);
 }
 
 function loadNotifications(): Notification[] {

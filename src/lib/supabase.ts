@@ -263,3 +263,78 @@ export async function syncAllDataToSupabase(data: {
     };
   }
 }
+
+// ── Otomatik Başlatma, Otomatik Tohumlama (Auto-Seed) ve Canlı Dinleme (Realtime) ──
+
+let realtimeSubscription: any = null;
+let isAutoSyncInitialized = false;
+
+export async function setupSupabaseAutoSync(callbacks: {
+  getInitialData: () => {
+    guests: Guest[];
+    staff: StaffMember[];
+    roles: RoleDefinition[];
+    rooms: Room[];
+  };
+  onRemoteGuestsLoaded: (remoteGuests: Guest[]) => void;
+  onRemoteStaffLoaded: (remoteStaff: StaffMember[]) => void;
+}) {
+  if (typeof window === "undefined" || !isSupabaseConfigured) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  if (isAutoSyncInitialized) return;
+  isAutoSyncInitialized = true;
+
+  try {
+    // 1. Supabase tablosundaki kayıt sayısını kontrol et
+    const { count, error } = await client
+      .from("guests")
+      .select("*", { count: "exact", head: true });
+
+    if (!error) {
+      if (count === 0 || count === null) {
+        // Tablo henüz boş! OTOMATİK OLARAK doldur (Yöneticiye ihtiyaç duymadan)
+        const initial = callbacks.getInitialData();
+        await syncAllDataToSupabase(initial);
+      } else {
+        // Tabloda veri var! En güncel verileri çek ve yerel duruma uygula
+        const remoteGuests = await fetchGuestsFromSupabase();
+        if (remoteGuests && remoteGuests.length > 0) {
+          callbacks.onRemoteGuestsLoaded(remoteGuests);
+        }
+        const remoteStaff = await fetchStaffFromSupabase();
+        if (remoteStaff && remoteStaff.length > 0) {
+          callbacks.onRemoteStaffLoaded(remoteStaff);
+        }
+      }
+    }
+
+    // 2. Canlı Değişiklik Dinleyicisi (Realtime Subscription)
+    // Bir personel telefondan konuk veya randevu güncellediğinde, diğer ekranlar anında güncellenir
+    if (!realtimeSubscription) {
+      realtimeSubscription = client
+        .channel("bct-live-updates")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "guests" },
+          async () => {
+            const updated = await fetchGuestsFromSupabase();
+            if (updated) callbacks.onRemoteGuestsLoaded(updated);
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "staff" },
+          async () => {
+            const updated = await fetchStaffFromSupabase();
+            if (updated) callbacks.onRemoteStaffLoaded(updated);
+          }
+        )
+        .subscribe();
+    }
+  } catch (err) {
+    console.warn("[BCT-OS] Supabase otomatik senkronizasyon:", err);
+  }
+}
+

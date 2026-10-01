@@ -17,6 +17,8 @@ import {
   isRoleRestricted,
   canUserManageGuestStatus,
   subscribe,
+  applyRemoteGuests,
+  applyRemoteStaff,
   type Guest,
   type GuestStatus,
   type StaffMember,
@@ -24,6 +26,7 @@ import {
   type Room,
   type RoleDefinition,
 } from "@/lib/store";
+import { setupSupabaseAutoSync } from "@/lib/supabase";
 
 /**
  * BCT-OS paylaşımlı store'dan anlık veri çeken hook.
@@ -53,6 +56,24 @@ export function useStore() {
   useEffect(() => {
     refresh();
     const unsub = subscribe(refresh);
+
+    // Supabase arka plan otomatik başlatma, boşsa otomatik tohumlama (Auto-seed)
+    // ve canlı veritabanı değişikliklerini anlık dinleme (Realtime)
+    setupSupabaseAutoSync({
+      getInitialData: () => ({
+        guests: getGuests(),
+        staff: getStaff(),
+        roles: getRoles(),
+        rooms: getRooms(),
+      }),
+      onRemoteGuestsLoaded: (remoteGuests) => {
+        applyRemoteGuests(remoteGuests);
+      },
+      onRemoteStaffLoaded: (remoteStaff) => {
+        applyRemoteStaff(remoteStaff);
+      },
+    });
+
     return () => {
       unsub();
     };
