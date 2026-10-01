@@ -650,7 +650,7 @@ export default function YonetimPage() {
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">
               <h4 className="font-bold text-slate-800 mb-1">Stüdyo Canlı Kapasitesi</h4>
               <p className="text-slate-500 leading-relaxed">
-                Stüdyo A ve B'de bugün toplam {guests.length} misafir ağırlandı. Tüm misafirlerin canlı yayın kayıtları stüdyo kurgu havuzuna aktarılmıştır.
+                Gri Stüdyo ve Orta Stüdyo&apos;da bugün toplam {guests.length} misafir ağırlandı. Tüm misafirlerin canlı yayın kayıtları stüdyo kurgu havuzuna aktarılmıştır.
               </p>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">

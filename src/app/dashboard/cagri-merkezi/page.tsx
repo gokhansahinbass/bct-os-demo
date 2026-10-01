@@ -21,7 +21,7 @@ export default function CagriMerkeziPage() {
   const [title, setTitle] = useState("Genel Müdür");
   const [representative, setRepresentative] = useState("Ayşe Yılmaz");
   const [appointmentTime, setAppointmentTime] = useState("12 Ekim 17:00");
-  const [studio, setStudio] = useState("Stüdyo A (4K)");
+  const [studio, setStudio] = useState("Gri Stüdyo");
 
   // Modals
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
@@ -894,7 +894,7 @@ export default function CagriMerkeziPage() {
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Stüdyo &amp; Çekim</span>
                     <strong className="text-slate-900 block mt-1">{currentGuest.studio}</strong>
-                    <span className="text-[11px] text-slate-500">Çekim Saati: {currentGuest.shootTime} ({currentGuest.shootDuration})</span>
+                    <span className="text-[11px] text-slate-500">Çekim Saati: {currentGuest.shootTime}</span>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Kurgucu &amp; Editör</span>

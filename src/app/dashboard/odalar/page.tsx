@@ -62,7 +62,7 @@ export default function OdalarPage() {
   const [newGuestRep, setNewGuestRep] = useState("Ayşe Yılmaz");
   const [newGuestDate, setNewGuestDate] = useState("14 Ekim 2026");
   const [newGuestTime, setNewGuestTime] = useState("14:30");
-  const [newGuestStudio, setNewGuestStudio] = useState("Stüdyo A (4K)");
+  const [newGuestStudio, setNewGuestStudio] = useState("Gri Stüdyo");
 
   // Helper: Geliş kategorisi (Gelen, Gelecek, İptal)
   function getGuestCategory(status: GuestStatus): "arrived" | "upcoming" | "cancelled" {
@@ -796,7 +796,6 @@ export default function OdalarPage() {
                               <span className="font-mono font-bold text-slate-900 text-xs">
                                 ⏰ {g.appointmentTime}
                               </span>
-                              <span className="text-[10px] text-slate-400">({g.shootDuration || "25 dk"})</span>
                             </div>
                           </td>
 
@@ -1437,7 +1436,7 @@ export default function OdalarPage() {
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 uppercase font-semibold block">Randevu &amp; Çekim Saati</span>
-                    <strong className="text-slate-900 text-sm block mt-0.5">⏰ {currentGuest.appointmentTime} ({currentGuest.shootDuration})</strong>
+                    <strong className="text-slate-900 text-sm block mt-0.5">⏰ {currentGuest.appointmentTime}</strong>
                   </div>
                 </div>
 
@@ -1744,8 +1743,8 @@ export default function OdalarPage() {
                     onChange={(e) => setNewGuestStudio(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:border-blue-500"
                   >
-                    <option value="Stüdyo A (4K)">Stüdyo A (4K)</option>
-                    <option value="Stüdyo B">Stüdyo B</option>
+                    <option value="Gri Stüdyo">Gri Stüdyo</option>
+                    <option value="Orta Stüdyo">Orta Stüdyo</option>
                   </select>
                 </div>
               </div>

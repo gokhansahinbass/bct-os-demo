@@ -88,7 +88,7 @@ export default function KioskPage() {
         appointmentTime: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
         shootTime: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
         shootDuration: "25 dk",
-        studio: "Stüdyo A",
+        studio: "Gri Stüdyo",
         editor: "",
         amount: "0",
         paymentStatus: "odenmedi",

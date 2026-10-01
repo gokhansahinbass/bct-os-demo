@@ -62,7 +62,7 @@ export async function fetchGuestsFromSupabase(): Promise<Guest[] | null> {
       appointmentTime: row.appointment_time,
       shootTime: row.shoot_time,
       shootDuration: row.shoot_duration || "25 dk",
-      studio: row.studio || "Stüdyo A (4K)",
+      studio: row.studio || "Gri Stüdyo",
       editor: row.editor || "",
       amount: row.amount || "0",
       paymentStatus: row.payment_status || "odenmedi",

@@ -218,7 +218,7 @@ export default function IzlemePage() {
                         {status.text}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mb-2">{g.company} • {g.shootDuration}</p>
+                    <p className="text-xs text-slate-500 mb-2">{g.company}</p>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-slate-500">Kurgucu: <strong className="text-slate-700">{g.editor || "Atanmamış"}</strong></span>
@@ -264,7 +264,7 @@ export default function IzlemePage() {
               <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500">
                 <span>Kurgucu: <strong className="text-slate-800">{activeGuest.editor || "Atanmamış"}</strong></span>
                 <span className="text-slate-300">•</span>
-                <span>Çekim: {activeGuest.shootTime} ({activeGuest.shootDuration})</span>
+                <span>Çekim: {activeGuest.shootTime}</span>
                 <span className="text-slate-300">•</span>
                 <span>Stüdyo: {activeGuest.studio}</span>
               </div>

@@ -282,7 +282,7 @@ export default function MontajPage() {
                       </span>
                       <span className="inline-flex items-center gap-1 text-slate-500 text-[11px]">
                         <span className="material-symbols-outlined text-[14px]">schedule</span>
-                        {card.shootTime} ({card.shootDuration})
+                        {card.shootTime}
                       </span>
                     </div>
 
@@ -372,10 +372,6 @@ export default function MontajPage() {
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-[#0F172A] text-xs font-mono border border-slate-200">
                         <span className="material-symbols-outlined text-[15px] text-slate-400">videocam</span>
                         {card.studio}
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[#2563EB] text-[11px] font-medium border border-blue-100">
-                        <span className="material-symbols-outlined text-[14px]">timer</span>
-                        {card.shootDuration || "25 dk"}
                       </span>
                       <span className="font-mono text-xs text-slate-400">{card.registrationNo}</span>
                     </div>

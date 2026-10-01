@@ -1530,7 +1530,7 @@ CREATE TABLE IF NOT EXISTS public.guests (
     appointment_time TEXT,
     shoot_time TEXT,
     shoot_duration TEXT DEFAULT '25 dk',
-    studio TEXT DEFAULT 'Stüdyo A (4K)',
+    studio TEXT DEFAULT 'Gri Stüdyo',
     editor TEXT DEFAULT '',
     amount TEXT NOT NULL DEFAULT '0',
     payment_status TEXT NOT NULL DEFAULT 'odenmedi',

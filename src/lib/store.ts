@@ -391,7 +391,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "14:30",
     shootTime: "14:15",
     shootDuration: "25 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "Gökhan",
     amount: "60.000",
     paymentStatus: "on_odeme",
@@ -480,7 +480,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "16:30",
     shootTime: "11:45",
     shootDuration: "18 dk",
-    studio: "Stüdyo A",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "ucretsiz",
@@ -510,7 +510,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "17:00",
     shootTime: "12:40",
     shootDuration: "30 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "50.000",
     paymentStatus: "on_odeme",
@@ -566,7 +566,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "11:00",
     shootTime: "11:15",
     shootDuration: "20 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -595,7 +595,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "17:30",
     shootTime: "17:35",
     shootDuration: "25 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "35.000",
     paymentStatus: "on_odeme",
@@ -628,7 +628,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "18:00",
     shootTime: "18:15",
     shootDuration: "20 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -661,7 +661,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "15:00",
     shootTime: "13:30",
     shootDuration: "32 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "Gökhan",
     amount: "45.000",
     paymentStatus: "tamamlandi",
@@ -696,7 +696,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "14:00",
     shootTime: "14:15",
     shootDuration: "25 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -725,7 +725,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "10:30",
     shootTime: "10:45",
     shootDuration: "30 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -756,7 +756,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "16:00",
     shootTime: "13:00",
     shootDuration: "25 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "40.000",
     paymentStatus: "on_odeme",
@@ -789,7 +789,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "13:00",
     shootTime: "13:15",
     shootDuration: "20 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "ucretsiz",
@@ -819,7 +819,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "10:30",
     shootTime: "10:45",
     shootDuration: "25 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -850,7 +850,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "15:30",
     shootTime: "15:45",
     shootDuration: "30 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -879,7 +879,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "16:00",
     shootTime: "16:15",
     shootDuration: "25 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -910,7 +910,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "12:00",
     shootTime: "12:15",
     shootDuration: "35 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "Gökhan",
     amount: "55.000",
     paymentStatus: "on_odeme",
@@ -943,7 +943,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "15:45",
     shootTime: "16:00",
     shootDuration: "20 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "ucretsiz",
@@ -973,7 +973,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "14:45",
     shootTime: "15:00",
     shootDuration: "25 dk",
-    studio: "Stüdyo A (4K)",
+    studio: "Gri Stüdyo",
     editor: "",
     amount: "30.000",
     paymentStatus: "on_odeme",
@@ -1006,7 +1006,7 @@ const DEFAULT_GUESTS: Guest[] = [
     appointmentTime: "16:30",
     shootTime: "16:45",
     shootDuration: "25 dk",
-    studio: "Stüdyo B",
+    studio: "Orta Stüdyo",
     editor: "",
     amount: "0",
     paymentStatus: "odenmedi",
@@ -1449,6 +1449,14 @@ function saveAuditLogs(logs: AuditLog[]) {
   localStorage.setItem(AUDIT_LOGS_STORAGE_KEY, JSON.stringify(logs));
 }
 
+function normalizeStudio(studioName?: string): string {
+  if (!studioName) return "Gri Stüdyo";
+  if (studioName.includes("B") || studioName.toLowerCase().includes("orta")) {
+    return "Orta Stüdyo";
+  }
+  return "Gri Stüdyo";
+}
+
 function loadGuests(): Guest[] {
   if (typeof window === "undefined") return DEFAULT_GUESTS;
   try {
@@ -1471,9 +1479,12 @@ function loadGuests(): Guest[] {
           // VIP KURALI: Paket almayan biri (ücretli hizmeti olmayan) ASLA VIP OLAMAZ!
           const hasPaidServices = services.length > 0 && services.some((s) => s.price > 0);
           const totalAmount = services.reduce((sum, s) => sum + (s.price || 0), 0);
+          const rawStudio = g.studio || defaultMatch?.studio;
+          const studio = normalizeStudio(rawStudio);
 
           return {
             ...g,
+            studio,
             services,
             vip: hasPaidServices,
             amount: totalAmount > 0 ? totalAmount.toLocaleString("tr-TR") : "0",
@@ -1793,6 +1804,7 @@ export function addGuest(
 
   const newGuest: Guest = {
     ...guest,
+    studio: normalizeStudio(guest.studio),
     paymentStatus: guest.paymentStatus || "odenmedi",
     onOdemeMiktari: guest.onOdemeMiktari || 0,
     vip: hasPaidServices,

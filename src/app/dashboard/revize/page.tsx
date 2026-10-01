@@ -374,7 +374,7 @@ export default function RevizePage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    {activeGuest.company} — {activeGuest.title} • Çekim: {activeGuest.shootTime} ({activeGuest.shootDuration}) • Kurgucu: <strong>{activeGuest.editor || "Gökhan"}</strong>
+                    {activeGuest.company} — {activeGuest.title} • Çekim: {activeGuest.shootTime} • Kurgucu: <strong>{activeGuest.editor || "Gökhan"}</strong>
                   </p>
                 </div>
 
