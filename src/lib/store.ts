@@ -4102,6 +4102,55 @@ export function updateGuestPayment(
   return true;
 }
 
+export function batchUpdateGuestPayments(
+  updates: Array<{
+    guestId: string;
+    onOdemeMiktari: number;
+    paymentStatus: "odenmedi" | "on_odeme" | "tamamlandi" | "ucretsiz";
+  }>
+): number {
+  if (!Array.isArray(updates) || updates.length === 0) return 0;
+  const guests = loadGuests();
+  let updatedCount = 0;
+
+  for (const item of updates) {
+    const guest = guests.find((g) => g.id === item.guestId);
+    if (guest) {
+      guest.onOdemeMiktari = item.onOdemeMiktari;
+      guest.paymentStatus = item.paymentStatus;
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    saveGuests(guests);
+    const currentUser = getCurrentUser();
+
+    addNotification({
+      to: "muhasebe",
+      from: currentUser?.name || "Excel İçe Aktarım",
+      type: "success",
+      title: "📊 Excel'den Ödemeler Güncellendi",
+      message: `${updatedCount} adet konuğun tahsilat miktarı Excel dosyasından topluca güncellendi.`,
+      link: "/dashboard/muhasebe",
+    });
+
+    addAuditLog({
+      userName: currentUser?.name || "Muhasebe",
+      userRole: currentUser?.role || "Muhasebe",
+      action: "Excel ile Toplu Ödeme Güncellemesi",
+      target: `${updatedCount} Konuk Kaydı`,
+      category: "system",
+      details: `Excel / CSV dosyasından ${updatedCount} konuğun alınan ve kalan ödeme miktarları güncellendi.`,
+    });
+
+    notify();
+  }
+
+  return updatedCount;
+}
+
+
 
 
 
