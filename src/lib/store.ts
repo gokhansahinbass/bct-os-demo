@@ -4150,6 +4150,12 @@ export function batchUpdateGuestPayments(
   return updatedCount;
 }
 
+export function openGuestDossier(guestId: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("bct-open-guest-dossier", { detail: { guestId } }));
+}
+
+
 
 
 

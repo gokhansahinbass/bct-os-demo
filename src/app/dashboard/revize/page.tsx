@@ -10,6 +10,7 @@ import {
   updateGuestStatus,
   addNotification,
   Guest,
+  openGuestDossier,
 } from "@/lib/store";
 
 export default function RevizePage() {
@@ -305,6 +306,17 @@ export default function RevizePage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold text-sm text-[#0F172A] truncate">{g.name}</h3>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openGuestDossier(g.id);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 transition p-0.5 text-xs shrink-0"
+                            title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                          >
+                            👁️
+                          </button>
                           {Boolean(g.services && g.services.length > 0 && g.services.some(s => s.price > 0)) && (
                             <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded border border-amber-200">
                               VIP
@@ -374,6 +386,15 @@ export default function RevizePage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-bold text-[#0F172A]">{activeGuest.name}</h2>
+                    <button
+                      type="button"
+                      onClick={() => openGuestDossier(activeGuest.id)}
+                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                      title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                    >
+                      <span>360° Röntgen</span>
+                      <span>👁️</span>
+                    </button>
                     <span className="text-xs font-mono px-2 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">
                       {activeGuest.registrationNo}
                     </span>

@@ -9,6 +9,7 @@ import {
   deleteNoteFromGuest,
   updateGuestStatus,
   addNotification,
+  openGuestDossier,
 } from "@/lib/store";
 
 export default function IzlemePage() {
@@ -261,9 +262,22 @@ export default function IzlemePage() {
                   {isSelected && <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#2563EB] rounded-r-full"></div>}
                   <div className={isSelected ? "pl-2" : ""}>
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors">
-                        {g.name}
-                      </h3>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors truncate">
+                          {g.name}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openGuestDossier(g.id);
+                          }}
+                          className="text-slate-400 hover:text-blue-600 transition p-0.5 text-xs shrink-0"
+                          title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                        >
+                          👁️
+                        </button>
+                      </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded border font-medium whitespace-nowrap ${status.color}`}>
                         {status.text}
                       </span>
@@ -296,6 +310,15 @@ export default function IzlemePage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="text-2xl font-bold text-[#0F172A] tracking-tight">{activeGuest.name}</h2>
+                    <button
+                      type="button"
+                      onClick={() => openGuestDossier(activeGuest.id)}
+                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                      title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                    >
+                      <span>360° Röntgen</span>
+                      <span>👁️</span>
+                    </button>
                     <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${getStatusLabel(activeGuest.status).color}`}>
                       {getStatusLabel(activeGuest.status).text}
                     </span>

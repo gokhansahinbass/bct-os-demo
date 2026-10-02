@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import type { RequestTargetDepartment, RequestPriority, RequestStatus } from "@/lib/store";
+import { openGuestDossier } from "@/lib/store";
 
 const DEPT_MAP: Record<RequestTargetDepartment, { label: string; color: string; icon: string }> = {
   reji: { label: "Reji & Stüdyo", color: "bg-purple-50 text-purple-700 border-purple-200", icon: "videocam" },
@@ -383,12 +384,23 @@ export default function IletisimPage() {
                 <div className="mt-3 space-y-2">
                   {/* Konuk / Firma Bilgisi */}
                   {req.guestName ? (
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
                       <span className="font-bold text-slate-900 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[16px] text-blue-600">person</span>
                         <span>{req.guestName}</span>
                       </span>
                       {req.company && <span className="text-slate-500 font-medium">({req.company})</span>}
+                      {req.guestId && (
+                        <button
+                          type="button"
+                          onClick={() => openGuestDossier(req.guestId!)}
+                          className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 transition"
+                          title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                        >
+                          <span>360° Röntgen</span>
+                          <span>👁️</span>
+                        </button>
+                      )}
                       {req.representative && (
                         <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.2 rounded-full font-semibold">
                           Temsilci: {req.representative}
@@ -532,15 +544,15 @@ export default function IletisimPage() {
               </div>
 
               {/* Hedef Departman & Öncelik */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    İlgilenecek Birim (Sevk Edilecek Departman) *
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div className="flex flex-col">
+                  <label className="block text-xs font-bold text-slate-700 mb-1 truncate" title="İlgili Birim (Departman)">
+                    İlgili Birim (Departman) *
                   </label>
                   <select
                     value={targetDept}
                     onChange={(e) => setTargetDept(e.target.value as RequestTargetDepartment)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-bold text-slate-800"
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-bold text-slate-800 h-10"
                   >
                     <option value="reji">Reji &amp; Canlı Stüdyo Çekim</option>
                     <option value="kurgu">Kurgu &amp; Montaj Departmanı</option>
@@ -556,14 +568,14 @@ export default function IletisimPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                <div className="flex flex-col">
+                  <label className="block text-xs font-bold text-slate-700 mb-1 truncate" title="Öncelik Seviyesi">
                     Öncelik Seviyesi *
                   </label>
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as RequestPriority)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-bold text-slate-800"
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-bold text-slate-800 h-10"
                   >
                     <option value="normal">Normal Öncelik</option>
                     <option value="yuksek">▲ Yüksek Öncelik</option>

@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import type { Guest } from "@/lib/store";
+import GuestNameClickable from "@/components/GuestNameClickable";
 
 export default function MuhasebePage() {
   const {
@@ -454,8 +455,12 @@ export default function MuhasebePage() {
                       {/* 1. Konuk & Firma */}
                       <td className="py-3.5 px-4">
                         <div>
-                          <p className="font-bold text-slate-900 text-sm">{g.name}</p>
-                          <p className="text-xs text-slate-500">{g.company || "Şirketsiz"}</p>
+                          <GuestNameClickable
+                            guestId={g.id}
+                            name={g.name}
+                            company={g.company || "Şirketsiz"}
+                            vip={g.vip}
+                          />
                           {g.representative && (
                             <span className="text-[10px] text-slate-400 block mt-0.5">
                               Temsilci: <strong className="text-slate-600">{g.representative}</strong>

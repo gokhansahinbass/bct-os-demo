@@ -11,6 +11,7 @@ import {
   type BroadcastSlot,
   type Guest,
   type YouTubeMetadata,
+  openGuestDossier,
 } from "@/lib/store";
 
 type YayinTab = "schedule" | "digitalCard" | "youtube";
@@ -765,6 +766,17 @@ export default function YayinPage() {
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-slate-900">{g.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGuestDossier(g.id);
+                              }}
+                              className="text-slate-400 hover:text-blue-600 transition p-0.5 text-xs shrink-0"
+                              title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                            >
+                              👁️
+                            </button>
                             <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                               ⭐ VIP
                             </span>
@@ -792,6 +804,15 @@ export default function YayinPage() {
                   <div>
                     <div className="flex items-center gap-3">
                       <h2 className="text-xl font-bold text-slate-900">{activeCardGuest.name}</h2>
+                      <button
+                        type="button"
+                        onClick={() => openGuestDossier(activeCardGuest.id)}
+                        className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                        title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                      >
+                        <span>360° Röntgen</span>
+                        <span>👁️</span>
+                      </button>
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                         ⭐ Ücretli Paket: {activeCardGuest.amount} ₺
                       </span>
@@ -949,6 +970,17 @@ export default function YayinPage() {
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-slate-900">{g.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGuestDossier(g.id);
+                              }}
+                              className="text-slate-400 hover:text-blue-600 transition p-0.5 text-xs shrink-0"
+                              title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                            >
+                              👁️
+                            </button>
                             <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                               ⭐ VIP
                             </span>
@@ -989,6 +1021,15 @@ export default function YayinPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-xl font-bold text-slate-900">{activeYtGuest.name}</h2>
+                      <button
+                        type="button"
+                        onClick={() => openGuestDossier(activeYtGuest.id)}
+                        className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                        title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                      >
+                        <span>360° Röntgen</span>
+                        <span>👁️</span>
+                      </button>
                       <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800 border border-red-200">
                         YouTube Masası
                       </span>

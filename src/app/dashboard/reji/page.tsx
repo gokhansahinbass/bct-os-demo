@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { type Guest } from "@/lib/store";
+import { type Guest, openGuestDossier } from "@/lib/store";
 import StudioDelayBanner from "@/components/StudioDelayBanner";
 import StudioDelayModal from "@/components/StudioDelayModal";
 import UpdateTimeModal from "@/components/UpdateTimeModal";
@@ -244,7 +244,18 @@ export default function RejiPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Şu An Çekimdeki Konuk</span>
-                      <h3 className="text-lg font-bold text-slate-900 mt-0.5">{griStudioGuest.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <h3 className="text-lg font-bold text-slate-900">{griStudioGuest.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => openGuestDossier(griStudioGuest.id)}
+                          className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-bold inline-flex items-center gap-1 border border-blue-200 transition"
+                          title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                        >
+                          <span>360° Röntgen</span>
+                          <span>👁️</span>
+                        </button>
+                      </div>
                       <p className="text-xs text-slate-600">{griStudioGuest.company} — {griStudioGuest.title}</p>
                     </div>
                     <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 text-xs font-bold font-mono">
@@ -352,7 +363,18 @@ export default function RejiPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Şu An Çekimdeki Konuk</span>
-                      <h3 className="text-lg font-bold text-slate-900 mt-0.5">{ortaStudioGuest.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <h3 className="text-lg font-bold text-slate-900">{ortaStudioGuest.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => openGuestDossier(ortaStudioGuest.id)}
+                          className="px-2 py-0.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-xs font-bold inline-flex items-center gap-1 border border-purple-200 transition"
+                          title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                        >
+                          <span>360° Röntgen</span>
+                          <span>👁️</span>
+                        </button>
+                      </div>
                       <p className="text-xs text-slate-600">{ortaStudioGuest.company} — {ortaStudioGuest.title}</p>
                     </div>
                     <span className="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 text-xs font-bold font-mono">
@@ -474,7 +496,15 @@ export default function RejiPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900 truncate">{g.name}</h4>
+                      <button
+                        type="button"
+                        onClick={() => openGuestDossier(g.id)}
+                        className="text-sm font-bold text-slate-900 hover:text-blue-600 hover:underline transition text-left flex items-center gap-1"
+                        title="360° Konuk Dosyasını Aç"
+                      >
+                        <span>{g.name}</span>
+                        <span className="text-xs text-blue-600">👁️</span>
+                      </button>
                       {g.vip && (
                         <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           ⭐ VIP
@@ -567,8 +597,16 @@ export default function RejiPage() {
               {completedToday.map((g) => (
                 <tr key={g.id} className="hover:bg-slate-50/70">
                   <td className="py-3 px-3">
-                    <strong className="text-slate-900 font-bold block">{g.name}</strong>
-                    <span className="text-[11px] text-slate-500">{g.company}</span>
+                    <button
+                      type="button"
+                      onClick={() => openGuestDossier(g.id)}
+                      className="text-slate-900 font-bold block text-left hover:text-blue-600 hover:underline flex items-center gap-1"
+                      title="360° Konuk Dosyasını Aç"
+                    >
+                      <span>{g.name}</span>
+                      <span className="text-xs text-blue-600 font-normal">👁️</span>
+                    </button>
+                    <span className="text-[11px] text-slate-500 block">{g.company}</span>
                   </td>
                   <td className="py-3 px-3">
                     <span className="inline-flex items-center gap-1 font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">

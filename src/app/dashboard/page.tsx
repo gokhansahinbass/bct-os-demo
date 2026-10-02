@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
 import { exportGuestsToCSV } from "@/lib/exportUtils";
+import { openGuestDossier } from "@/lib/store";
 
 export default function DashboardOverviewPage() {
   const {
@@ -318,7 +319,15 @@ export default function DashboardOverviewPage() {
                       {g.name[0]}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">{g.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => openGuestDossier(g.id)}
+                        className="text-xs font-bold text-slate-900 truncate hover:text-blue-600 hover:underline text-left flex items-center gap-1"
+                        title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                      >
+                        <span>{g.name}</span>
+                        <span className="text-[11px] text-blue-600">👁️</span>
+                      </button>
                       <p className="text-[11px] text-slate-400 truncate">{g.company} • {g.representative}</p>
                     </div>
                   </div>

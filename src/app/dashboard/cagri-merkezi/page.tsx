@@ -9,6 +9,7 @@ import {
   deleteGuest,
   type GuestStatus,
   type Guest,
+  openGuestDossier,
 } from "@/lib/store";
 import StudioDelayBanner from "@/components/StudioDelayBanner";
 import UpdateTimeModal from "@/components/UpdateTimeModal";
@@ -558,9 +559,18 @@ export default function CagriMerkeziPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-bold text-[#0F172A] group-hover:text-blue-600 transition">
-                              {g.name}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGuestDossier(g.id);
+                              }}
+                              className="text-sm font-bold text-[#0F172A] hover:text-blue-600 hover:underline transition text-left flex items-center gap-1 group/btn"
+                              title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                            >
+                              <span>{g.name}</span>
+                              <span className="text-[12px] opacity-70 group-hover/btn:opacity-100">👁️</span>
+                            </button>
                             {g.services && g.services.length > 0 && g.services.some(s => s.price > 0) ? (
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                 VIP
@@ -832,7 +842,18 @@ export default function CagriMerkeziPage() {
                       {repGuests.map((g) => (
                         <tr key={g.id} className="hover:bg-slate-50">
                           <td className="p-3 font-semibold text-slate-900">
-                            <div>{g.name}</div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGuestDossier(g.id);
+                              }}
+                              className="text-left font-bold text-slate-900 hover:text-blue-600 hover:underline flex items-center gap-1 transition"
+                              title="360° Konuk Dosyasını Aç"
+                            >
+                              <span>{g.name}</span>
+                              <span className="text-[11px] text-blue-600">👁️</span>
+                            </button>
                             <div className="text-[10px] text-slate-500 font-normal">{g.title}</div>
                           </td>
                           <td className="p-3 text-slate-600">

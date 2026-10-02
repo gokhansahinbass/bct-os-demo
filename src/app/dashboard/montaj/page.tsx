@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/useStore";
-import { updateGuest, getGuestDeadlineInfo, addNotification, type Guest } from "@/lib/store";
+import { updateGuest, getGuestDeadlineInfo, addNotification, type Guest, openGuestDossier } from "@/lib/store";
 
 export default function MontajPage() {
   const { guests, canAccessPage, isSensitiveBlurred, activeRoleDef } = useStore();
@@ -326,7 +326,15 @@ export default function MontajPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => openGuestDossier(card.id)}
+                          className="text-sm font-semibold text-[#0F172A] truncate leading-tight hover:text-blue-600 hover:underline text-left inline-flex items-center gap-1 group/btn"
+                          title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                        >
+                          <span>{card.name}</span>
+                          <span className="text-xs text-blue-600 opacity-60 group-hover/btn:opacity-100">👁️</span>
+                        </button>
                         <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
                       </div>
                       <VipBadge card={card} />
@@ -414,7 +422,15 @@ export default function MontajPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
+                          <button
+                            type="button"
+                            onClick={() => openGuestDossier(card.id)}
+                            className="text-sm font-semibold text-[#0F172A] truncate leading-tight hover:text-blue-600 hover:underline text-left inline-flex items-center gap-1 group/btn"
+                            title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                          >
+                            <span>{card.name}</span>
+                            <span className="text-xs text-blue-600 opacity-60 group-hover/btn:opacity-100">👁️</span>
+                          </button>
                           <span className="inline-flex items-center w-2 h-2 rounded-full bg-emerald-500"></span>
                         </div>
                         <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
@@ -505,7 +521,15 @@ export default function MontajPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-[#0F172A] truncate leading-tight">{card.name}</h3>
+                      <button
+                        type="button"
+                        onClick={() => openGuestDossier(card.id)}
+                        className="text-sm font-semibold text-[#0F172A] truncate leading-tight hover:text-blue-600 hover:underline text-left inline-flex items-center gap-1 group/btn"
+                        title="360° Konuk Dosyası ve Süreç Röntgenini Aç"
+                      >
+                        <span>{card.name}</span>
+                        <span className="text-xs text-blue-600 opacity-60 group-hover/btn:opacity-100">👁️</span>
+                      </button>
                       <p className="text-sm text-slate-500 truncate mt-0.5">{card.company} — {card.title}</p>
                     </div>
                     <VipBadge card={card} />

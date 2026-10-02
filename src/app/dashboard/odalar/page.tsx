@@ -10,6 +10,7 @@ import {
   addGuest,
   type Guest,
   type GuestStatus,
+  openGuestDossier,
 } from "@/lib/store";
 import StudioDelayBanner from "@/components/StudioDelayBanner";
 import UpdateTimeModal from "@/components/UpdateTimeModal";
@@ -744,7 +745,18 @@ export default function OdalarPage() {
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-slate-900 block text-xs">{g.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openGuestDossier(g.id);
+                                    }}
+                                    className="font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline text-left flex items-center gap-1 group/btn"
+                                    title="360° Konuk Röntgeni / Dosyasını Aç"
+                                  >
+                                    <span>{g.name}</span>
+                                    <span className="text-[11px] opacity-70 group-hover/btn:opacity-100">👁️</span>
+                                  </button>
                                   {g.vip && (
                                     <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
                                       VIP
@@ -1437,6 +1449,15 @@ export default function OdalarPage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h3 className="text-xl font-bold text-[#0F172A]">{currentGuest.name}</h3>
+                    <button
+                      type="button"
+                      onClick={() => openGuestDossier(currentGuest.id)}
+                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                      title="360° Konuk Süreç Röntgenini Aç"
+                    >
+                      <span>360° Röntgen</span>
+                      <span>👁️</span>
+                    </button>
                     <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">
                       {currentGuest.registrationNo}
                     </span>
@@ -1652,8 +1673,19 @@ export default function OdalarPage() {
                         return (
                           <tr key={g.id} className="hover:bg-slate-50">
                             <td className="p-3">
-                              <span className="font-bold text-slate-900 block">{g.name}</span>
-                              <span className="text-[10px] text-slate-500">{g.company}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openGuestDossier(g.id);
+                                }}
+                                className="font-bold text-slate-900 text-left hover:text-blue-600 hover:underline flex items-center gap-1"
+                                title="360° Konuk Dosyasını Aç"
+                              >
+                                <span>{g.name}</span>
+                                <span className="text-[11px] text-blue-600">👁️</span>
+                              </button>
+                              <span className="text-[10px] text-slate-500 block">{g.company}</span>
                             </td>
                             <td className="p-3">
                               <span className="text-xs font-semibold text-slate-700">

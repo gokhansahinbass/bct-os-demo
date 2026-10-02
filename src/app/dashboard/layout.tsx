@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import GuestDossierModal from "@/components/GuestDossierModal";
 import { useStore } from "@/lib/useStore";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -181,6 +182,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </main>
       </div>
+
+      {/* ── 360° KONUK DOSYASI GLOBAL MODALI ── */}
+      <GuestDossierModal />
     </div>
   );
 }
