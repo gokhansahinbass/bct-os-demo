@@ -114,19 +114,7 @@ export default function MuhasebePage() {
       item.totalAmount,
       "Tüm tahsilat muhasebe tarafından tamamlandı olarak işaretlendi."
     );
-    setFeedback(`✓ ${item.guest.name} için tüm ödeme tamamlandı olarak işaretlendi!`);
-    setTimeout(() => setFeedback(null), 3500);
-  }
-
-  // ── ÖDEMEYİ YENİDEN AÇ / DÜZELT ──
-  function handleReopenPayment(item: typeof guestFinancials[0]) {
-    updateGuestPayment(
-      item.guest.id,
-      "on_odeme",
-      0,
-      "Ödeme durumu muhasebe tarafından yeniden açıldı."
-    );
-    setFeedback(`ℹ️ ${item.guest.name} ödemesi düzenleme için yeniden açıldı.`);
+    setFeedback(`✓ ${item.guest.name} için tüm ödeme tamamlandı olarak işaretlendi.`);
     setTimeout(() => setFeedback(null), 3500);
   }
 
@@ -313,6 +301,7 @@ export default function MuhasebePage() {
 
           {/* Excel İndir */}
           <button
+            type="button"
             onClick={handleExportExcel}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
             title="Tüm konuk ödemelerini Excel formatında indirin"
@@ -322,13 +311,6 @@ export default function MuhasebePage() {
           </button>
         </div>
       </div>
-
-      {feedback && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center justify-between animate-fadeIn">
-          <span>{feedback}</span>
-          <button onClick={() => setFeedback(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">✕</button>
-        </div>
-      )}
 
       {/* ── 3 SADE VE BÜYÜK SAYAÇ KARTI ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -505,25 +487,44 @@ export default function MuhasebePage() {
                       {/* 4. Alınan Nakit (Düzenlenebilir) */}
                       <td className="py-3.5 px-4 text-right">
                         {isEditing ? (
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min={0}
                               value={editingAmount}
                               onChange={(e) => setEditingAmount(Number(e.target.value))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleSaveInlineAmount(g.id, item.totalAmount);
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setEditingGuestId(null);
+                                }
+                              }}
                               className="w-24 p-1 text-xs font-mono font-bold text-emerald-800 border-2 border-emerald-500 rounded bg-white text-right focus:outline-none"
                               autoFocus
                             />
                             <button
-                              onClick={() => handleSaveInlineAmount(g.id, item.totalAmount)}
-                              className="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleSaveInlineAmount(g.id, item.totalAmount);
+                              }}
+                              className="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 cursor-pointer"
                               title="Kaydet"
                             >
                               ✓
                             </button>
                             <button
-                              onClick={() => setEditingGuestId(null)}
-                              className="px-1.5 py-1 text-slate-400 hover:text-slate-600 text-xs"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setEditingGuestId(null);
+                              }}
+                              className="px-1.5 py-1 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                               title="İptal"
                             >
                               ✕
@@ -535,11 +536,14 @@ export default function MuhasebePage() {
                               ₺{item.collectedAmount.toLocaleString("tr-TR")}
                             </span>
                             <button
-                              onClick={() => {
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 setEditingGuestId(g.id);
                                 setEditingAmount(item.collectedAmount);
                               }}
-                              className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition cursor-pointer"
+                              className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition cursor-pointer"
                               title="Alınan Miktarı Doğrudan Değiştir"
                             >
                               <span className="material-symbols-outlined text-[14px]">edit</span>
@@ -590,7 +594,12 @@ export default function MuhasebePage() {
                       <td className="py-3.5 px-4 text-right">
                         {!item.isCompleted ? (
                           <button
-                            onClick={() => handleMarkCompleted(item)}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleMarkCompleted(item);
+                            }}
                             className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-2xs transition flex items-center gap-1.5 ml-auto cursor-pointer"
                             title="Tüm bakiyenin tahsil edildiğini onaylar ve kalan miktarı sıfırlar"
                           >
@@ -598,18 +607,11 @@ export default function MuhasebePage() {
                             <span>Ödeme Tamamlandı</span>
                           </button>
                         ) : (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                          <div className="flex items-center justify-end">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
                               <span className="material-symbols-outlined text-[16px]">done_all</span>
                               <span>Tahsil Edildi</span>
                             </span>
-                            <button
-                              onClick={() => handleReopenPayment(item)}
-                              className="text-[10px] text-slate-400 hover:text-slate-700 underline cursor-pointer ml-1"
-                              title="Ödeme durumunu düzenlemek için yeniden aç"
-                            >
-                              Düzelt
-                            </button>
                           </div>
                         )}
                       </td>
@@ -627,10 +629,25 @@ export default function MuhasebePage() {
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-slate-400 text-lg">help_outline</span>
           <span>
-            <strong>Nasıl Çalışır?</strong> Pazarlamacı ön ödeme girdiğinde kalan tutar burada otomatik olarak <em>"Tahsilat Bekleyen"</em> hanesine düşer. Kişi kalan parayı ödediğinde <strong>"Ödeme Tamamlandı"</strong> butonuna basmanız yeterlidir. Dilerseniz tüm listeyi Excel olarak indirip miktarları oradan da yükleyebilirsiniz.
+            <strong>Nasıl Çalışır?</strong> Pazarlamacı ön ödeme girdiğinde kalan tutar burada otomatik olarak <em>"Tahsilat Bekleyen"</em> hanesine düşer. Kişi kalan parayı ödediğinde <strong>"Ödeme Tamamlandı"</strong> butonuna basmanız yeterlidir. Alınan miktarı satırdaki kalem ✏️ ikonundan doğrudan düzenleyebilir veya Excel indirip düzenleyerek geri yükleyebilirsiniz.
           </span>
         </div>
       </div>
+
+      {/* ── YÜZEN BİLDİRİM TOASTI (SAYFAYI ASLA KAYDIRMAZ) ── */}
+      {feedback && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2.5 animate-fadeIn border border-slate-700">
+          <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
+          <span className="flex-1">{feedback}</span>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="text-slate-400 hover:text-white p-0.5 cursor-pointer ml-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
