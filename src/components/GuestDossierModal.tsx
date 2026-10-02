@@ -52,12 +52,12 @@ export default function GuestDossierModal() {
 
   // Yaşam Döngüsü Aşaması Hesaplama (Stepper)
   const isKioskDone = guest.status !== "appointment_set";
-  const isShootDone = ["shoot_done", "package_set", "review_approved", "ready_for_broadcast", "broadcasted"].includes(guest.status);
-  const isPackageSet = Boolean(guest.services && guest.services.length > 0) || ["package_set", "review_approved", "ready_for_broadcast", "broadcasted"].includes(guest.status);
-  const isMontajDone = ["review_approved", "ready_for_broadcast", "broadcasted"].includes(guest.status);
+  const isShootDone = ["shoot_done", "package_set", "editing", "edit_done", "reviewing", "review_approved", "publishing", "archived"].includes(guest.status);
+  const isPackageSet = Boolean(guest.services && guest.services.length > 0) || ["package_set", "editing", "edit_done", "reviewing", "review_approved", "publishing", "archived"].includes(guest.status);
+  const isMontajDone = ["edit_done", "reviewing", "review_approved", "publishing", "archived"].includes(guest.status);
   const hasRevisions = guest.notes && guest.notes.length > 0;
   const allRevisionsResolved = hasRevisions && guest.notes.every((n) => n.resolved);
-  const isBroadcastReady = ["ready_for_broadcast", "broadcasted"].includes(guest.status);
+  const isBroadcastReady = ["review_approved", "publishing", "archived"].includes(guest.status);
   const isYouTubePublished = guest.youtubeMetadata?.status === "yayinda";
 
   // Finansal Özet
@@ -224,22 +224,94 @@ export default function GuestDossierModal() {
                 </div>
               </div>
 
-              {/* Randevu Saat Durumu & Teyit */}
-              <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-blue-600 text-2xl">event_available</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-blue-950">Geliş Durumu &amp; Saat Teyidi</h4>
-                    <p className="text-xs text-blue-800 mt-0.5">
-                      {guest.timeConfirmed ? "✓ Temsilci tarafından vaktinde geleceği teyit edildi." : "Henüz teyit araması yapılmadı veya bekleniyor."}
-                      {guest.timeStatus === "gecikmeli" && ` (⚠️ Gecikme Bildirildi: ${guest.timeUpdateReason || "Trafik"})`}
-                    </p>
+              {/* Randevu Saat Durumu / Geliş Durumu */}
+              {guest.status === "cancelled" ? (
+                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-rose-600 text-2xl">event_busy</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-rose-950">Randevu Durumu: İptal Edildi</h4>
+                      <p className="text-xs text-rose-700 mt-0.5">
+                        Bu konuğun randevusu iptal edilmiştir. {guest.cancelledReason && `(Gerekçe: ${guest.cancelledReason})`}
+                      </p>
+                    </div>
                   </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-white text-rose-800 border border-rose-200 shrink-0">
+                    İptal Edildi
+                  </span>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-white text-blue-900 border border-blue-200 shadow-2xs shrink-0">
-                  {guest.timeStatus === "gecikmeli" ? "Gecikmeli" : guest.timeStatus === "erken_geldi" ? "Erken Geldi" : "Normal Vaktinde"}
-                </span>
-              </div>
+              ) : isKioskDone ? (
+                <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-bold text-emerald-950">
+                          Geliş &amp; Stüdyo Durumu: Konuk Stüdyoya Geldi ve İşlemleri Başladı
+                        </h4>
+                        <span className="text-[10px] font-black px-1.5 py-0.2 bg-emerald-200 text-emerald-900 rounded">
+                          Giriş Tamamlandı ✓
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800 mt-0.5">
+                        {isShootDone
+                          ? "Konuk stüdyo çekimini tamamlamış, montaj ve yayın süreçleri aktif olarak yürütülmektedir."
+                          : guest.status === "in_studio"
+                          ? `Konuk şu anda ${guest.studio || "Stüdyo"} içinde çekimdedir.`
+                          : "Konuk stüdyoya giriş yapmıştır, bekleme salonunda stüdyo çağrısı beklemektedir."}
+                        {guest.timeStatus === "erken_geldi" && " • (Erken Giriş Yaptı)"}
+                        {guest.timeStatus === "gecikmeli" && ` • (Gecikmeli Giriş: ${guest.timeUpdateReason || "Trafik/Yoğunluk"})`}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full font-bold bg-white text-emerald-900 border border-emerald-300 shadow-2xs shrink-0 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>
+                      {guest.status === "archived"
+                        ? "Arşivlendi"
+                        : guest.status === "publishing"
+                        ? "Yayında"
+                        : guest.status === "review_approved"
+                        ? "İzleme Onayladı"
+                        : guest.status === "reviewing"
+                        ? "İzleme Masasında"
+                        : guest.status === "edit_done"
+                        ? "Kurgu Bitti"
+                        : guest.status === "editing"
+                        ? "Kurguda"
+                        : guest.status === "package_set"
+                        ? "Paket Tanımlandı"
+                        : guest.status === "shoot_done"
+                        ? "Çekim Tamamlandı"
+                        : guest.status === "in_studio"
+                        ? "Çekimde"
+                        : "Stüdyoda (Giriş Yaptı)"}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-blue-600 text-2xl">event_available</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-blue-950">Geliş Durumu &amp; Saat Teyidi (Stüdyoya Bekleniyor)</h4>
+                      <p className="text-xs text-blue-800 mt-0.5">
+                        {guest.timeConfirmed
+                          ? `✓ Temsilcisi (${guest.representative || "Çağrı Merkezi"}) tarafından arandı ve vaktinde geleceği teyit edildi.`
+                          : "Konuk henüz stüdyoya ulaşmadı. Saat teyit araması planlanıyor."}
+                        {guest.timeStatus === "gecikmeli" && ` (⚠️ Gecikme Bildirildi: ${guest.timeUpdateReason || "Trafik"})`}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-white text-blue-900 border border-blue-200 shadow-2xs shrink-0">
+                    {guest.timeStatus === "gecikmeli"
+                      ? "Gecikmeli Gelecek"
+                      : guest.timeConfirmed
+                      ? "Vaktinde Geliyor ✓"
+                      : "Teyit Bekleniyor"}
+                  </span>
+                </div>
+              )}
 
               {/* Alt Bant (KJ) Sosyal Medya Seçimleri */}
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
