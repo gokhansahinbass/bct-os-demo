@@ -26,6 +26,7 @@ export default function KioskPage() {
   const [confirmed, setConfirmed] = useState(true);
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "success">("idle");
   const [lastRegNo, setLastRegNo] = useState<string>("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Çağrı Merkezi Randevu Eşleştirme State'leri
   const [matchedGuest, setMatchedGuest] = useState<Guest | null>(null);
@@ -107,7 +108,7 @@ export default function KioskPage() {
     setPlatformValues({});
   }
 
-  const handleSubmit = useCallback(() => {
+  function handlePreSubmit() {
     if (!fullName.trim()) {
       alert("Lütfen ad ve soyadınızı giriniz.");
       return;
@@ -120,6 +121,10 @@ export default function KioskPage() {
       alert("Lütfen alt bant önizlemesini onaylayınız.");
       return;
     }
+    setShowConfirmModal(true);
+  }
+
+  const executeSubmit = useCallback(() => {
 
     setSubmitState("loading");
 
@@ -224,7 +229,12 @@ export default function KioskPage() {
         setSubmitState("idle");
       }, 4000);
     }, 800);
-  }, [fullName, title, platformValues, showInVideo, confirmed, matchedGuest]);
+  }, [fullName, title, platformValues, showInVideo, matchedGuest]);
+
+  function handleFinalSubmit() {
+    setShowConfirmModal(false);
+    executeSubmit();
+  }
 
   const previewName = fullName.trim() ? fullName.toUpperCase() : "MİSAFİR AD SOYAD";
   const previewTitle = title.trim() ? title : "Firma & Unvan Bilgisi (Örn: Yazılım A.Ş. — Kurucu Ortak)";
@@ -479,7 +489,8 @@ export default function KioskPage() {
           {/* Submit Button */}
           <div className="pt-4 border-t border-slate-100">
             <button
-              onClick={handleSubmit}
+              type="button"
+              onClick={handlePreSubmit}
               disabled={submitState === "loading" || submitState === "success"}
               className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 submitState === "success"
@@ -579,6 +590,145 @@ export default function KioskPage() {
           </div>
         </div>
       </main>
+
+      {/* ── BİLGİ DOĞRULAMA & ONAY MODALI (CONFIRMATION MODAL) ── */}
+      {showConfirmModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fadeIn"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowConfirmModal(false);
+          }}
+        >
+          <div className="bg-white max-w-xl w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-scaleUp">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600/80 border border-blue-400/40 flex items-center justify-center text-xl shrink-0">
+                  <span className="material-symbols-outlined text-[24px]">verified_user</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Bilgilerinizi Onaylayınız (Son Kontrol)</h3>
+                  <p className="text-xs text-blue-200 mt-0.5">
+                    Lütfen ekranda ve televizyon alt bandında (KJ) yer alacak bilgileri kontrol ediniz.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto text-xs">
+              {/* Randevu Eşleşmesi Varsa Bilgi */}
+              {matchedGuest ? (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center gap-3">
+                  <span className="material-symbols-outlined text-emerald-600 text-2xl shrink-0">how_to_reg</span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">
+                      ✓ Çağrı Merkezi Randevusu Eşleştirildi
+                    </span>
+                    <p className="text-xs text-emerald-950 font-bold mt-0.5">
+                      {matchedGuest.name} — Randevu: {matchedGuest.appointmentTime || "Bugün"} (Temsilci: {matchedGuest.representative || "Çağrı Merkezi"})
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-2.5 text-slate-600">
+                  <span className="material-symbols-outlined text-slate-400 text-xl shrink-0">info</span>
+                  <span>Bu kayıt doğrudan stüdyo terminalinden yeni konuk girişi olarak oluşturulacaktır.</span>
+                </div>
+              )}
+
+              {/* Kişisel & Kurumsal Bilgiler */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Konuk Adı &amp; Soyadı
+                  </span>
+                  <span className="text-base font-black text-slate-900 block mt-0.5 tracking-tight">
+                    {fullName.trim().toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="pt-2.5 border-t border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Firma &amp; Resmi Unvan (Alt Bant Metni)
+                  </span>
+                  <span className="text-sm font-bold text-slate-800 block mt-0.5">
+                    {title.trim()}
+                  </span>
+                </div>
+              </div>
+
+              {/* İletişim & Alt Bant (KJ) Sosyal Medya */}
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  İletişim &amp; Alt Bant (KJ) Bilgileri
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PLATFORM_OPTIONS.map((p) => {
+                    const rawVal = platformValues[p.key];
+                    if (!rawVal?.trim()) return null;
+                    const inVideo = showInVideo.includes(p.key);
+                    const formatted = p.prefix && !rawVal.startsWith(p.prefix) ? `${p.prefix} ${rawVal}` : rawVal;
+
+                    return (
+                      <div
+                        key={p.key}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                          inVideo ? "bg-blue-50/70 border-blue-200" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-slate-400 block font-medium">{p.label}</span>
+                          <span className="font-mono text-xs font-bold text-slate-800 truncate block">
+                            {formatted}
+                          </span>
+                        </div>
+                        {inVideo ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">
+                            📺 Alt Bantta
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-slate-400 shrink-0">
+                            Sistemde
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer"
+              >
+                ✕ Vazgeç / Bilgileri Düzenle
+              </button>
+
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>Evet, Bu Bilgiler Benim — Onaylıyorum</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
