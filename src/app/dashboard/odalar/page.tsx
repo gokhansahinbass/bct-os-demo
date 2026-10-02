@@ -712,21 +712,19 @@ export default function OdalarPage() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="p-3">Konuk &amp; Mesleği</th>
-                    <th className="p-3">Konuğu Getiren Personel &amp; Rolü</th>
-                    <th className="p-3">Şirket &amp; İletişim</th>
-                    <th className="p-3">Geleceği Tarih</th>
-                    <th className="p-3">Randevu &amp; Çekim Saati</th>
-                    <th className="p-3">Geliş Durumu</th>
-                    <th className="p-3">Paket / Satış Durumu</th>
-                    <th className="p-3">Stüdyo &amp; Kurgu</th>
-                    <th className="p-3 text-center">İşlem &amp; Aksiyon</th>
+                    <th className="px-2.5 py-2.5">Konuk &amp; Mesleği</th>
+                    <th className="px-2.5 py-2.5">Temsilci</th>
+                    <th className="px-2.5 py-2.5">Şirket &amp; İletişim</th>
+                    <th className="px-2.5 py-2.5">Randevu &amp; Saat</th>
+                    <th className="px-2.5 py-2.5">Geliş Durumu</th>
+                    <th className="px-2.5 py-2.5">Paket &amp; Stüdyo</th>
+                    <th className="px-2.5 py-2.5 text-right">İşlem &amp; Aksiyon</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {roomFilteredGuests.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                      <td colSpan={7} className="p-8 text-center text-slate-400 italic">
                         Bu odaya ve seçilen personele ait konuk kaydı bulunmuyor.
                       </td>
                     </tr>
@@ -737,14 +735,14 @@ export default function OdalarPage() {
 
                       return (
                         <tr key={g.id} className="hover:bg-slate-50 transition-colors">
-                          {/* Konuk & Mesleği */}
-                          <td className="p-3">
+                          {/* 1. Konuk & Mesleği */}
+                          <td className="px-2.5 py-2">
                             <div className="flex items-center gap-2">
                               <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
                                 {g.name.split(" ").map((w) => w[0]).join("")}
                               </div>
-                              <div>
-                                <div className="flex items-center gap-1.5">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -763,118 +761,89 @@ export default function OdalarPage() {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[11px] text-slate-500">{g.title}</span>
+                                <span className="text-[11px] text-slate-500 block truncate max-w-[130px]">{g.title}</span>
                               </div>
                             </div>
                           </td>
 
-                          {/* Konuğu Getiren Personel & Rolü */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                  isLeaderRep ? "bg-indigo-600 text-white" : "bg-blue-100 text-blue-800"
-                                }`}
-                              >
-                                {g.representative.split(" ").map((w) => w[0]).join("")}
-                              </div>
-                              <div>
-                                <span className="font-bold text-slate-900 block text-xs">{g.representative}</span>
-                                {isLeaderRep ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                    👑 Oda Şefi
-                                  </span>
-                                ) : (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                                    📞 Çağrı Temsilcisi
-                                  </span>
-                                )}
-                              </div>
+                          {/* 2. Temsilci */}
+                          <td className="px-2.5 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 text-xs block whitespace-nowrap">{g.representative}</span>
+                              {isLeaderRep && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                                  👑 Şef
+                                </span>
+                              )}
                             </div>
                           </td>
 
-                          {/* Şirket & İletişim */}
-                          <td className="p-3 text-slate-700">
-                            <span className="font-semibold block">{g.company}</span>
-                            <span className="text-[10px] font-mono text-slate-400">
+                          {/* 3. Şirket & İletişim */}
+                          <td className="px-2.5 py-2 text-slate-700">
+                            <span className="font-semibold block text-xs truncate max-w-[130px]" title={g.company}>{g.company}</span>
+                            <span className="text-[10px] font-mono text-slate-400 block whitespace-nowrap">
                               {isContactBlurred ? "+90 (532) *** ** 12" : g.phone}
                             </span>
                           </td>
 
-                          {/* Geleceği Tarih */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                              <span className="text-slate-400">📅</span>
+                          {/* 4. Randevu & Saat (Tarih ve Saat Birleşik) */}
+                          <td className="px-2.5 py-2">
+                            <div className="flex items-center gap-1 text-xs font-bold text-slate-900 whitespace-nowrap">
                               <span>{g.appointmentDate || "12 Ekim 2026"}</span>
+                              <span className="text-slate-400 font-normal">•</span>
+                              <span className="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                                ⏰ {g.appointmentTime}
+                              </span>
                             </div>
+                            {studioDelays[g.studio]?.active && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 block w-fit mt-0.5" title="Stüdyoda çekim sarkması var">
+                                ⚠️ +{studioDelays[g.studio].delayMinutes} dk sarktı
+                              </span>
+                            )}
+                            {g.timeStatus === "gecikmeli" && (
+                              <span className="text-[9px] font-bold text-amber-800 block mt-0.5 truncate max-w-[130px]" title={g.timeUpdateReason || "Geç Gelecek"}>
+                                ⏳ Geç {g.timeUpdateReason ? `(${g.timeUpdateReason})` : ""}
+                              </span>
+                            )}
+                            {g.timeStatus === "erken_geldi" && (
+                              <span className="text-[9px] font-bold text-blue-800 block mt-0.5">
+                                ⚡ Erken Geldi
+                              </span>
+                            )}
+                            {category === "upcoming" && (!g.timeStatus || g.timeStatus === "normal") && (
+                              g.timeConfirmed ? (
+                                <span className="text-[9px] font-semibold text-emerald-700 block mt-0.5">
+                                  ✓ Vaktinde Geliyor
+                                </span>
+                              ) : g.representativeRemindedAt ? (
+                                <span className="text-[9px] font-bold text-amber-700 block mt-0.5">
+                                  ⚠️ Teyit Bekleniyor
+                                </span>
+                              ) : null
+                            )}
                           </td>
 
-                          {/* Randevu & Çekim Saati */}
-                          <td className="p-3">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-bold text-slate-900 text-xs">
-                                  ⏰ {g.appointmentTime}
-                                </span>
-                                {studioDelays[g.studio]?.active && (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Stüdyoda çekim sarkması var">
-                                    ⚠️ +{studioDelays[g.studio].delayMinutes} dk sarktı
-                                  </span>
-                                )}
-                              </div>
-
-                              {g.timeStatus === "gecikmeli" && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 w-fit">
-                                  <span>⏳ Geç Gelecek</span>
-                                  {g.timeUpdateReason && (
-                                    <span className="text-[9px] text-amber-800 italic max-w-[130px] truncate" title={g.timeUpdateReason}>
-                                      • {g.timeUpdateReason}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-
-                              {g.timeStatus === "erken_geldi" && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300 w-fit">
-                                  <span>⚡ Erken Geldi</span>
-                                </span>
-                              )}
-
-                              {category === "upcoming" && (!g.timeStatus || g.timeStatus === "normal") && (
-                                g.timeConfirmed ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
-                                    <span>✓</span> Vaktinde Geliyor
-                                  </span>
-                                ) : g.representativeRemindedAt ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
-                                    <span>⚠️</span> Teyit Bekleniyor
-                                  </span>
-                                ) : null
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Geliş Durumu */}
-                          <td className="p-3">
+                          {/* 5. Geliş Durumu */}
+                          <td className="px-2.5 py-2 whitespace-nowrap">
                             {category === "arrived" && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                                🟢 GELDİ
+                                GELDİ
                               </span>
                             )}
                             {category === "upcoming" && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
-                                🟡 GELECEK
+                                GELECEK
                               </span>
                             )}
                             {category === "cancelled" && (
                               <div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                  🔴 İPTAL OLDU
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  İPTAL OLDU
                                 </span>
                                 {g.cancelledReason && (
-                                  <span className="text-[10px] text-rose-600 block mt-0.5 italic max-w-xs truncate" title={g.cancelledReason}>
+                                  <span className="text-[9px] text-rose-600 block mt-0.5 italic max-w-[110px] truncate" title={g.cancelledReason}>
                                     {g.cancelledReason}
                                   </span>
                                 )}
@@ -882,40 +851,30 @@ export default function OdalarPage() {
                             )}
                           </td>
 
-                          {/* Paket / Satış Durumu */}
-                          <td className="p-3">
-                            <div>
-                              <span className="font-mono font-bold text-slate-900 text-xs block">
-                                {isRevBlurred ? (
-                                  <span className="text-slate-400 font-normal">🔒 ₺***.***</span>
-                                ) : (
-                                  g.amount !== "0" && g.amount ? `₺${g.amount}` : "Ücretsiz Canlı Yayın"
-                                )}
-                              </span>
-                              {g.marketer && (
-                                <span className="text-[10px] text-slate-400 block font-normal">
-                                  Pazarlama: {g.marketer}
-                                </span>
+                          {/* 6. Paket & Stüdyo (Birleşik) */}
+                          <td className="px-2.5 py-2">
+                            <span className="font-mono font-bold text-slate-900 text-xs block whitespace-nowrap">
+                              {isRevBlurred ? (
+                                <span className="text-slate-400 font-normal">🔒 ₺***.***</span>
+                              ) : (
+                                g.amount !== "0" && g.amount ? `₺${g.amount}` : "Ücretsiz Canlı Yayın"
                               )}
-                            </div>
+                            </span>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[130px]">
+                              {g.studio?.replace("Stüdyo", "St.")} • {g.editor || "Gökhan"}
+                            </span>
                           </td>
 
-                          {/* Stüdyo & Kurgu */}
-                          <td className="p-3 text-slate-600 text-[11px]">
-                            <div>{g.studio}</div>
-                            <span className="text-[10px] text-slate-400">Kurgu: {g.editor || "Gökhan"}</span>
-                          </td>
-
-                          {/* İşlem & Aksiyon */}
-                          <td className="p-3 text-center">
+                          {/* 7. İşlem & Aksiyon */}
+                          <td className="px-2.5 py-2 text-right whitespace-nowrap">
                             {(() => {
                               const canEdit = canManageGuest(g, roomDef.leaderName);
 
                               return (
-                                <div className="flex items-center justify-center gap-1.5">
+                                <div className="flex items-center justify-end gap-1">
                                   <button
                                     onClick={() => setSelectedGuestModal(g)}
-                                    className="px-2 py-1 text-xs font-semibold rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition"
+                                    className="px-2 py-1 text-[11px] font-semibold rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition"
                                     title="Tüm Detayları Gör"
                                   >
                                     Detay
@@ -927,10 +886,10 @@ export default function OdalarPage() {
                                         <>
                                           <button
                                             onClick={() => setUpdateTimeModalGuest(g)}
-                                            className="px-2 py-1 text-xs font-semibold rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer transition flex items-center gap-1 shadow-2xs"
+                                            className="px-1.5 py-1 text-[11px] font-semibold rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer transition flex items-center gap-0.5"
                                             title="Konuğun randevu saatini veya gecikme/erken geliş beyanını güncelle"
                                           >
-                                            <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                            <span className="material-symbols-outlined text-[12px]">schedule</span>
                                             <span>Saat</span>
                                           </button>
 
@@ -941,25 +900,25 @@ export default function OdalarPage() {
                                                 setFeedbackToast(`🔔 ${g.representative} adlı temsilciye "${g.name}" için acil teyit hatırlatması iletildi.`);
                                                 setTimeout(() => setFeedbackToast(null), 4000);
                                               }}
-                                              className="px-2 py-1 text-xs font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer transition flex items-center gap-1 shadow-2xs"
-                                              title="Davet eden temsilciye konuğu arayıp teyit etmesi için bildirim gönder"
+                                              className="px-1.5 py-1 text-[11px] font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer transition flex items-center gap-0.5"
+                                              title="Davet eden temsilciye teyit hatırlatması gönder"
                                             >
-                                              <span className="material-symbols-outlined text-[13px] text-amber-600">notifications_active</span>
+                                              <span className="material-symbols-outlined text-[12px] text-amber-600">notifications_active</span>
                                               <span>Teyit</span>
                                             </button>
                                           )}
 
                                           <button
                                             onClick={() => handleMarkArrived(g, roomDef.leaderName)}
-                                            className="px-2 py-1 text-xs font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer transition shadow-2xs"
-                                            title="Konuk Geldi, Çekime Al (Yetkili: Siz)"
+                                            className="px-2 py-1 text-[11px] font-bold rounded bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition shadow-2xs"
+                                            title="Konuk Geldi, Çekime Al"
                                           >
                                             ✓ Geldi
                                           </button>
                                           <button
                                             onClick={() => setCancelModalGuest(g)}
-                                            className="px-2 py-1 text-xs font-semibold rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer transition"
-                                            title="Randevuyu İptal Et (Yetkili: Siz)"
+                                            className="px-1.5 py-1 text-[11px] font-semibold rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer transition"
+                                            title="Randevuyu İptal Et"
                                           >
                                             İptal
                                           </button>
@@ -969,8 +928,8 @@ export default function OdalarPage() {
                                       {category === "cancelled" && (
                                         <button
                                           onClick={() => handleRestoreGuest(g, roomDef.leaderName)}
-                                          className="px-2 py-1 text-xs font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 cursor-pointer transition"
-                                          title="İptali Geri Al ve Randevuya Döndür (Yetkili: Siz)"
+                                          className="px-2 py-1 text-[11px] font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 cursor-pointer transition"
+                                          title="İptali Geri Al"
                                         >
                                           ↺ Geri Al
                                         </button>

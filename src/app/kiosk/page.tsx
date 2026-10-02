@@ -83,10 +83,12 @@ export default function KioskPage() {
 
     // Sosyal medya ve iletişim verilerini doldur
     const newPlatformValues: Record<string, string> = {};
-    if (candidate.phone) newPlatformValues.phone = candidate.phone;
-    if (candidate.instagram) newPlatformValues.instagram = candidate.instagram;
+    if (candidate.phone) {
+      newPlatformValues.phone = candidate.phone.replace(/^\+90\s*/, "").replace(/^0\s*/, "").trim();
+    }
+    if (candidate.instagram) newPlatformValues.instagram = candidate.instagram.replace(/^@/, "").trim();
     if (candidate.website) newPlatformValues.website = candidate.website;
-    if (candidate.socialMedia?.x) newPlatformValues.x = candidate.socialMedia.x;
+    if (candidate.socialMedia?.x) newPlatformValues.x = candidate.socialMedia.x.replace(/^@/, "").trim();
     if (candidate.socialMedia?.linkedin) newPlatformValues.linkedin = candidate.socialMedia.linkedin;
     if (candidate.socialMedia?.facebook) newPlatformValues.facebook = candidate.socialMedia.facebook;
     if (candidate.socialMedia?.youtube) newPlatformValues.youtube = candidate.socialMedia.youtube;
@@ -413,16 +415,32 @@ export default function KioskPage() {
                         <span className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
                           {platform.icon}
                         </span>
-                        <div className="relative flex-1">
+                        <div className="flex-1 flex items-center rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-blue-600 focus-within:border-blue-600 bg-white">
                           {platform.prefix && (
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium select-none">{platform.prefix}</span>
+                            <span className="bg-slate-50 border-r border-slate-200 px-2.5 py-2 text-slate-500 text-xs font-bold select-none shrink-0">
+                              {platform.prefix}
+                            </span>
                           )}
                           <input
-                            className={`w-full rounded-lg border border-slate-200 ${platform.prefix ? "pl-8" : "pl-3"} pr-3 py-2 text-slate-800 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400`}
+                            className="w-full px-3 py-2 text-slate-800 text-sm focus:outline-none placeholder:text-slate-400 bg-transparent"
                             placeholder={platform.placeholder}
                             type="text"
-                            value={value}
-                            onChange={(e) => setPlatformValue(platform.key, e.target.value)}
+                            value={
+                              platform.prefix === "+90"
+                                ? value.replace(/^\+90\s*/, "").replace(/^0\s*/, "")
+                                : platform.prefix === "@"
+                                ? value.replace(/^@+/, "")
+                                : value
+                            }
+                            onChange={(e) => {
+                              let val = e.target.value;
+                              if (platform.prefix === "+90") {
+                                val = val.replace(/^\+90\s*/, "").replace(/^0\s*/, "");
+                              } else if (platform.prefix === "@") {
+                                val = val.replace(/^@+/, "");
+                              }
+                              setPlatformValue(platform.key, val);
+                            }}
                           />
                         </div>
                         <button
