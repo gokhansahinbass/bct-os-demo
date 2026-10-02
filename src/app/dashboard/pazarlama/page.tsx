@@ -106,9 +106,17 @@ export default function PazarlamaPage() {
   const [newServiceNote, setNewServiceNote] = useState("");
   const [customPageCount, setCustomPageCount] = useState("");
 
-  // Finans Durumu
+  // Finans & KDV Durumu
   const [paymentStatus, setPaymentStatus] = useState<"odenmedi" | "on_odeme" | "tamamlandi" | "ucretsiz">("odenmedi");
   const [onOdemeMiktari, setOnOdemeMiktari] = useState<number>(0);
+  const [kdvTipi, setKdvTipi] = useState<"dahil" | "haric">("dahil");
+  const [invoiceType, setInvoiceType] = useState<"kurumsal" | "bireysel">("kurumsal");
+  const [taxTitle, setTaxTitle] = useState("");
+  const [taxOffice, setTaxOffice] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
+  const [invoiceEmail, setInvoiceEmail] = useState("");
+  const [invoiceAddress, setInvoiceAddress] = useState("");
+  const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
 
   const filteredGuests = useMemo(() => {
     return guests.filter((g) => {
@@ -132,6 +140,13 @@ export default function PazarlamaPage() {
     if (g) {
       setPaymentStatus(g.paymentStatus || "odenmedi");
       setOnOdemeMiktari(g.onOdemeMiktari || 0);
+      setKdvTipi(g.kdvTipi || "dahil");
+      setInvoiceType(g.invoiceType || "kurumsal");
+      setTaxTitle(g.taxTitle || g.company || "");
+      setTaxOffice(g.taxOffice || "");
+      setTaxNumber(g.taxNumber || "");
+      setInvoiceEmail(g.invoiceEmail || "");
+      setInvoiceAddress(g.invoiceAddress || "");
     }
   }
 
@@ -182,14 +197,40 @@ export default function PazarlamaPage() {
   function handleSaveAndSendToEdit() {
     if (!activeGuest) return;
 
-    const totalPrice = activeGuest.services.reduce((sum, s) => sum + s.price, 0);
+    const basePrice = activeGuest.services.reduce((sum, s) => sum + s.price, 0);
+
+    let finalNetMatrah = basePrice;
+    let finalKdvTutari = 0;
+    let finalToplamKdvli = basePrice;
+
+    if (kdvTipi === "dahil") {
+      finalNetMatrah = Math.round(basePrice / 1.20);
+      finalKdvTutari = basePrice - finalNetMatrah;
+      finalToplamKdvli = basePrice;
+    } else {
+      finalNetMatrah = basePrice;
+      finalKdvTutari = Math.round(basePrice * 0.20);
+      finalToplamKdvli = basePrice + finalKdvTutari;
+    }
 
     updateGuest(activeGuest.id, {
-      amount: totalPrice.toLocaleString("tr-TR"),
+      amount: finalToplamKdvli.toLocaleString("tr-TR"),
       paymentStatus,
       onOdemeMiktari: paymentStatus === "on_odeme" ? onOdemeMiktari : 0,
-      vip: totalPrice > 0,
+      vip: finalToplamKdvli > 0,
       status: "package_set",
+      kdvTipi,
+      kdvOrani: 20,
+      netTutar: finalNetMatrah,
+      kdvTutari: finalKdvTutari,
+      toplamTutarKdvli: finalToplamKdvli,
+      invoiceType,
+      taxTitle: taxTitle.trim() || activeGuest.company,
+      taxOffice: taxOffice.trim(),
+      taxNumber: taxNumber.trim(),
+      invoiceEmail: invoiceEmail.trim(),
+      invoiceAddress: invoiceAddress.trim(),
+      invoiceStatus: activeGuest.invoiceStatus || "kesilmedi",
     });
 
     // 1) Kurgu / Montaj Ekibine Bildirim
@@ -198,7 +239,7 @@ export default function PazarlamaPage() {
       from: "pazarlama",
       type: "task",
       title: `🎬 Paket Tanımlandı: ${activeGuest.name}`,
-      message: `${activeGuest.name} (${activeGuest.company}) için ${activeGuest.services.length} adet hizmet tanımlandı (${totalPrice.toLocaleString("tr-TR")} TL). Montaj kuyruğunda kurguya hazır.`,
+      message: `${activeGuest.name} (${activeGuest.company}) için ${activeGuest.services.length} adet hizmet tanımlandı (${finalToplamKdvli.toLocaleString("tr-TR")} TL). Montaj kuyruğunda kurguya hazır.`,
       link: "/dashboard/montaj",
     });
 
@@ -209,7 +250,7 @@ export default function PazarlamaPage() {
         from: "pazarlama",
         type: "success",
         title: `🎉 Tebrikler! Satış Kaydedildi: ${activeGuest.name}`,
-        message: `Davet ettiğiniz konuğunuz ${activeGuest.name} için ${totalPrice.toLocaleString("tr-TR")} TL değerinde paket satışı tamamlandı.`,
+        message: `Davet ettiğiniz konuğunuz ${activeGuest.name} için ${finalToplamKdvli.toLocaleString("tr-TR")} TL değerinde paket satışı tamamlandı.`,
         link: "/dashboard/odalar",
       });
     }
@@ -240,17 +281,27 @@ export default function PazarlamaPage() {
       });
     }
 
-    // 5) Yönetim ve Genel Sistem
+    // 5) Muhasebe ve Finans Departmanına Bildirim (KDV Dahil / Hariç detayıyla)
+    addNotification({
+      to: "muhasebe",
+      from: "pazarlama",
+      type: "info",
+      title: `🧾 Yeni Fatura & Satış Talebi: ${activeGuest.name}`,
+      message: `${activeGuest.company} - ${finalToplamKdvli.toLocaleString("tr-TR")} TL (${kdvTipi === "dahil" ? "KDV Dahil" : "KDV Hariç +%20"}). Matrah: ${finalNetMatrah.toLocaleString("tr-TR")} TL, KDV: ${finalKdvTutari.toLocaleString("tr-TR")} TL.`,
+      link: "/dashboard/muhasebe",
+    });
+
+    // 6) Yönetim ve Genel Sistem
     addNotification({
       to: "yonetim",
       from: "pazarlama",
       type: "info",
       title: `💼 Yeni Satış Sözleşmesi: ${activeGuest.name}`,
-      message: `${activeGuest.company} - ${totalPrice.toLocaleString("tr-TR")} TL (${paymentStatus === "on_odeme" ? `Ön Ödeme: ${onOdemeMiktari.toLocaleString("tr-TR")} TL` : paymentStatus}) onaylandı.`,
+      message: `${activeGuest.company} - ${finalToplamKdvli.toLocaleString("tr-TR")} TL (${paymentStatus === "on_odeme" ? `Ön Ödeme: ${onOdemeMiktari.toLocaleString("tr-TR")} TL` : paymentStatus}) onaylandı.`,
       link: "/dashboard/yonetim",
     });
 
-    setFeedback(`✓ ${activeGuest.name} paketi ve ödeme bilgisi kaydedildi, montaj ve ilgili birimlere bildirim gönderildi!`);
+    setFeedback(`✓ ${activeGuest.name} paketi, KDV modeli (${kdvTipi === "dahil" ? "KDV Dahil" : "KDV Hariç"}) ve fatura bilgisi kaydedildi!`);
     setTimeout(() => setFeedback(null), 4000);
   }
 
@@ -259,7 +310,10 @@ export default function PazarlamaPage() {
   }
 
   const selectedTemplate = getServiceTemplate(newServiceType);
-  const totalBill = activeGuest ? activeGuest.services.reduce((sum, s) => sum + s.price, 0) : 0;
+  const baseServiceTotal = activeGuest ? activeGuest.services.reduce((sum, s) => sum + s.price, 0) : 0;
+  const netMatrah = kdvTipi === "dahil" ? Math.round(baseServiceTotal / 1.20) : baseServiceTotal;
+  const kdvTutari = kdvTipi === "dahil" ? baseServiceTotal - netMatrah : Math.round(baseServiceTotal * 0.20);
+  const totalBill = kdvTipi === "dahil" ? baseServiceTotal : baseServiceTotal + kdvTutari;
   const remainingBill = Math.max(0, totalBill - (paymentStatus === "on_odeme" ? onOdemeMiktari : paymentStatus === "tamamlandi" ? totalBill : 0));
 
   if (!canAccessPage("/dashboard/pazarlama")) {
@@ -377,10 +431,17 @@ export default function PazarlamaPage() {
                   </div>
 
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
-                    <div className="flex items-center gap-2 text-slate-500">
+                    <div className="flex items-center gap-1.5 text-slate-500">
                       <span>{g.shootTime}</span>
                       <span>•</span>
                       <span className="text-blue-600 font-medium">{serviceCount} Hizmet</span>
+                      {g.kdvTipi && (
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                          g.kdvTipi === "dahil" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"
+                        }`}>
+                          {g.kdvTipi === "dahil" ? "KDV Dahil" : "+%20 KDV"}
+                        </span>
+                      )}
                     </div>
 
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
@@ -513,25 +574,65 @@ export default function PazarlamaPage() {
               )}
             </div>
 
-            {/* Finans & Tahsilat (Requirement #4: No rigid kapora, flexible Ön Ödeme) */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
+            {/* Finans, KDV & Fatura Yönetimi */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Ödeme & Tahsilat Yönetimi
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[17px] text-blue-600">receipt_long</span>
+                    Fiyat, KDV &amp; Fatura Yönetimi
                   </h4>
-                  <p className="text-xs text-slate-500">Müşterinin ödeme modelini ve varsa ön ödeme tutarını belirleyin</p>
+                  <p className="text-xs text-slate-500">KDV modelini belirleyin, muhasebe için fatura bilgilerini eksiksiz kaydedin</p>
                 </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-slate-500 block">Toplam Tutar</span>
-                  <span className="text-lg font-bold text-slate-900 font-mono">₺{totalBill.toLocaleString("tr-TR")}</span>
+
+                {/* KDV Dahil / Hariç Menüsü */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setKdvTipi("dahil")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      kdvTipi === "dahil"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    KDV Dahil (%20)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKdvTipi("haric")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      kdvTipi === "haric"
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    KDV Hariç (+%20)
+                  </button>
                 </div>
               </div>
 
+              {/* Live KDV Breakdown Bar */}
+              <div className="grid grid-cols-3 gap-3 p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs font-mono text-center">
+                <div className="border-r border-slate-100 pr-2">
+                  <span className="text-[10px] uppercase font-sans text-slate-400 font-semibold block">Net Matrah</span>
+                  <span className="text-xs font-bold text-slate-700">₺{netMatrah.toLocaleString("tr-TR")}</span>
+                </div>
+                <div className="border-r border-slate-100 px-2">
+                  <span className="text-[10px] uppercase font-sans text-slate-400 font-semibold block">KDV (%20)</span>
+                  <span className="text-xs font-bold text-blue-600">₺{kdvTutari.toLocaleString("tr-TR")}</span>
+                </div>
+                <div className="pl-2">
+                  <span className="text-[10px] uppercase font-sans text-slate-400 font-semibold block">Genel Toplam</span>
+                  <span className="text-sm font-bold text-emerald-700">₺{totalBill.toLocaleString("tr-TR")}</span>
+                </div>
+              </div>
+
+              {/* Tahsilat Durumu & Ön Ödeme */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Tahsilat Durumu
+                    Tahsilat Modeli
                   </label>
                   <select
                     value={paymentStatus}
@@ -539,13 +640,12 @@ export default function PazarlamaPage() {
                     className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800 focus:outline-none focus:border-blue-500"
                   >
                     <option value="odenmedi">Ödeme Alınmadı / Beklemede</option>
-                    <option value="on_odeme">Ön Ödeme Yapıldı</option>
+                    <option value="on_odeme">Ön Ödeme Alındı (Kısmi)</option>
                     <option value="tamamlandi">Tamamı Tahsil Edildi</option>
                     <option value="ucretsiz">Ücretsiz / Sponsorluk</option>
                   </select>
                 </div>
 
-                {/* Ön Ödeme Miktarı Input (Only visible when 'on_odeme' is selected) */}
                 {paymentStatus === "on_odeme" ? (
                   <div>
                     <label className="block text-xs font-semibold text-blue-700 mb-1.5">
@@ -564,7 +664,7 @@ export default function PazarlamaPage() {
                       />
                     </div>
                     <span className="text-[10px] text-slate-500 mt-1 block">
-                      Kalan Bakiye: <strong className="text-amber-700 font-mono">₺{remainingBill.toLocaleString("tr-TR")}</strong>
+                      Kalan Tahsilat: <strong className="text-amber-700 font-mono">₺{remainingBill.toLocaleString("tr-TR")}</strong>
                     </span>
                   </div>
                 ) : (
@@ -572,6 +672,102 @@ export default function PazarlamaPage() {
                     {paymentStatus === "tamamlandi" && <span className="text-emerald-600 font-semibold">✓ Tutarın tamamı tahsil edilmiştir.</span>}
                     {paymentStatus === "ucretsiz" && <span className="text-slate-500">Konuk çekim ve yayını ücretsiz olarak tanımlanmıştır.</span>}
                     {paymentStatus === "odenmedi" && <span className="text-amber-700 font-semibold">⚠️ Henüz herhangi bir ödeme alınmamıştır.</span>}
+                  </div>
+                )}
+              </div>
+
+              {/* Kurumsal / Bireysel Fatura Bilgileri (Muhasebecinin işini sıfır hataya indiren bölüm) */}
+              <div className="pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceDetails(!showInvoiceDetails)}
+                  className="flex items-center justify-between w-full py-1.5 text-xs font-semibold text-slate-700 hover:text-blue-600 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">domain</span>
+                    <span>Resmi Fatura &amp; VKN / TC Bilgileri</span>
+                    {taxTitle && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold font-mono">
+                        Dolu
+                      </span>
+                    )}
+                  </span>
+                  <span className="material-symbols-outlined text-[18px]">
+                    {showInvoiceDetails ? "expand_less" : "expand_more"}
+                  </span>
+                </button>
+
+                {showInvoiceDetails && (
+                  <div className="mt-3 p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 animate-fadeIn">
+                    <div className="flex items-center gap-4 text-xs font-medium text-slate-700">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="invType"
+                          checked={invoiceType === "kurumsal"}
+                          onChange={() => setInvoiceType("kurumsal")}
+                          className="text-blue-600"
+                        />
+                        <span>Kurumsal (Firma / Şirket)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="invType"
+                          checked={invoiceType === "bireysel"}
+                          onChange={() => setInvoiceType("bireysel")}
+                          className="text-blue-600"
+                        />
+                        <span>Bireysel (Şahıs / TC)</span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          {invoiceType === "kurumsal" ? "Fatura Unvanı" : "Ad Soyad"}
+                        </label>
+                        <input
+                          type="text"
+                          value={taxTitle}
+                          onChange={(e) => setTaxTitle(e.target.value)}
+                          placeholder={activeGuest.company || "Firma veya Şahıs Unvanı"}
+                          className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          {invoiceType === "kurumsal" ? "Vergi Kimlik No (VKN)" : "T.C. Kimlik No"}
+                        </label>
+                        <input
+                          type="text"
+                          value={taxNumber}
+                          onChange={(e) => setTaxNumber(e.target.value)}
+                          placeholder={invoiceType === "kurumsal" ? "10 haneli VKN" : "11 haneli TCKN"}
+                          className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Vergi Dairesi</label>
+                        <input
+                          type="text"
+                          value={taxOffice}
+                          onChange={(e) => setTaxOffice(e.target.value)}
+                          placeholder="Örn: Maslak V.D."
+                          className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fatura E-Postası (E-Arşiv / E-Fatura)</label>
+                        <input
+                          type="email"
+                          value={invoiceEmail}
+                          onChange={(e) => setInvoiceEmail(e.target.value)}
+                          placeholder="muhasebe@firma.com"
+                          className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

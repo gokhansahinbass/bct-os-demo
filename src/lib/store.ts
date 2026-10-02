@@ -142,6 +142,43 @@ export interface StudioDelay {
   active: boolean;
 }
 
+// ── İletişim Masası & Konuk Talepleri Modeli ──
+export type RequestTargetDepartment =
+  | "reji"
+  | "kurgu"
+  | "pazarlama"
+  | "muhasebe"
+  | "cagri_merkezi"
+  | "odalar"
+  | "dergi"
+  | "ek_hizmetler"
+  | "izleme"
+  | "teknik"
+  | "yonetim";
+
+export type RequestPriority = "dusuk" | "normal" | "yuksek" | "acil";
+
+export type RequestStatus = "beklemede" | "islemde" | "cozuldu" | "iptal";
+
+export interface GuestRequest {
+  id: string;
+  guestId?: string;
+  guestName?: string;
+  company?: string;
+  representative?: string;
+  studio?: string;
+  targetDepartment: RequestTargetDepartment;
+  priority: RequestPriority;
+  status: RequestStatus;
+  title: string;
+  description: string;
+  reportedBy: string;
+  assignedTo?: string;
+  resolutionNote?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 export interface Guest {
   id: string;
   name: string;
@@ -180,6 +217,22 @@ export interface Guest {
   timeConfirmed?: boolean;            // Temsilci tarafından aranıp vaktinde geleceği teyit edildi mi?
   timeConfirmedAt?: string;           // Teyit alınma zamanı
   representativeRemindedAt?: string;  // Temsilciye teyit hatırlatmasının gönderildiği zaman
+
+  // KDV & Muhasebe / Faturalandırma Bilgileri
+  kdvTipi?: "dahil" | "haric";        // Fiyat KDV Dahil mi Hariç mi?
+  kdvOrani?: number;                  // Varsayılan: 20 (%20 KDV)
+  netTutar?: number;                  // KDV Hariç Matrah
+  kdvTutari?: number;                 // Hesaplanan KDV Tutarı
+  toplamTutarKdvli?: number;          // KDV Dahil Nihai Fatura Bedeli
+  invoiceType?: "kurumsal" | "bireysel"; // Kurumsal (Firma) / Bireysel
+  taxTitle?: string;                  // Fatura Unvanı
+  taxOffice?: string;                 // Vergi Dairesi
+  taxNumber?: string;                 // Vergi No / TC Kimlik No
+  invoiceAddress?: string;            // Fatura Adresi
+  invoiceEmail?: string;              // Fatura Gönderilecek E-Posta
+  invoiceStatus?: "kesilmedi" | "kesildi" | "muaf"; // Fatura Kesilme Durumu
+  invoiceNo?: string;                 // Kesilen Fatura No (Örn: BCT202600000124)
+  invoiceDate?: string;               // Fatura Kesim Tarihi
 }
 
 // ── Personel (Staff) Arayüzü ──
@@ -268,6 +321,8 @@ export const PERMISSION_GROUPS = {
     { key: "yayin", label: "Dijital Kart & Yayın", shortLabel: "Yayın", desc: "QR kart ve canlı yayın teslimi", icon: "qr_code_2" },
     { key: "yonetim", label: "Yönetim Kokpiti", shortLabel: "Yönetim", desc: "Üst düzey ciro ve ekip analitiği", icon: "insights" },
     { key: "reji", label: "Reji & Stüdyo Çağrı", shortLabel: "Reji", desc: "Gri ve Orta Stüdyo çekim durumu ve bekleme salonundan konuk çağırma", icon: "videocam" },
+    { key: "iletisim", label: "İletişim & Talep Masası", shortLabel: "İletişim", desc: "Konuk talepleri, birim sevkleri ve şikayet/destek yönetimi", icon: "support_agent" },
+    { key: "muhasebe", label: "Muhasebe & Finans", shortLabel: "Muhasebe", desc: "KDV hesapları, tahsilatlar, faturalandırma ve finansal raporlar", icon: "account_balance" },
     { key: "admin", label: "Sistem Ayarları", shortLabel: "Admin", desc: "Personel, RBAC ve veri yönetimi", icon: "admin_panel_settings" },
   ] as PermissionItem[],
 
@@ -293,11 +348,35 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     label: "Süper Admin",
     color: "red",
     department: "Yönetim",
-    description: "Tüm sistem, odalar, finans, dergi ve personel yetkilerine tam erişim.",
+    description: "Tüm sistem, odalar, finans, dergi, iletişim, muhasebe ve personel yetkilerine tam erişim.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true, reji: true,
+      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: true, izleme: true, revize: true, yayin: true, yonetim: true, admin: true, reji: true, iletisim: true, muhasebe: true,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: true,
+    },
+  },
+  {
+    key: "muhasebe",
+    label: "Muhasebe & Finans Müdürü",
+    color: "emerald",
+    department: "Muhasebe & Finans",
+    description: "KDV hesapları, faturalandırma, tahsilat icmalleri, alacak takibi ve resmi finansal raporlama.",
+    permissions: {
+      cagri: false, odalar: true, pazarlama: true, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: true, admin: false, reji: false, iletisim: true, muhasebe: true,
+      room_oda1: true, room_oda2: true, room_oda3: true,
+      view_montaj_stats: false, view_revision_details: false, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: false,
+    },
+  },
+  {
+    key: "iletisim",
+    label: "İletişim & Talep Koordinatörü",
+    color: "orange",
+    department: "İletişim Masası",
+    description: "Konuk ve temsilci taleplerini alma, yazılı olarak ilgili birimlere (Reji, Kurgu, Muhasebe vb.) sevk etme ve çözüm takibi.",
+    permissions: {
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: true, iletisim: true, muhasebe: false,
+      room_oda1: true, room_oda2: true, room_oda3: true,
+      view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
   },
   {
@@ -307,7 +386,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Dergi Masası",
     description: "Müşterilerin dergi siparişlerini takip etme, içerik/dosya toplama ve baskı onaylama.",
     permissions: {
-      cagri: false, odalar: false, pazarlama: false, dergi: true, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: false, odalar: false, pazarlama: false, dergi: true, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -319,7 +398,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Çağrı Merkezi",
     description: "Oda ekibini yönetme, teyit hedefleri belirleme ve bizzat kendi konuklarını getirme yetkisi.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -331,7 +410,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Çağrı Merkezi",
     description: "Bireysel konuk randevusu oluşturma, teyit alma ve getirdiği konukları takip etme.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -341,9 +420,9 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     label: "Pazarlama Sorumlusu",
     color: "emerald",
     department: "Pazarlama Masası",
-    description: "Dergi, haber sitesi, reels paket satışı ve tahsilat yönetimi.",
+    description: "Dergi, haber sitesi, reels paket satışı, KDV ve tahsilat yönetimi.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false,
+      cagri: true, odalar: true, pazarlama: true, dergi: true, ek_hizmetler: true, montaj: false, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: true,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: true, view_guest_contact: true, can_edit_packages: true, can_delete_records: false,
     },
@@ -355,7 +434,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Kurgu & Montaj",
     description: "Ham video kurgusu, alt bant hazırlama ve revize takibi.",
     permissions: {
-      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: true, yayin: false, yonetim: false, admin: false,
+      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: true, yayin: false, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: false, view_guest_contact: false, can_edit_packages: false, can_delete_records: false,
     },
@@ -367,7 +446,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "İzleme Masası",
     description: "Video kalite onayı, revize notu düşme ve sevk kontrolü.",
     permissions: {
-      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: true, revize: true, yayin: true, yonetim: false, admin: false,
+      cagri: false, odalar: false, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: false, izleme: true, revize: true, yayin: true, yonetim: false, admin: false, reji: false, iletisim: true, muhasebe: false,
       room_oda1: false, room_oda2: false, room_oda3: false,
       view_montaj_stats: true, view_revision_details: true, view_financial_revenue: false, view_guest_contact: false, can_edit_packages: false, can_delete_records: false,
     },
@@ -379,7 +458,7 @@ export const DEFAULT_ROLES_LIST: RoleDefinition[] = [
     department: "Stüdyo & Reji",
     description: "Gri Stüdyo ve Orta Stüdyo canlı çekim akışı, bekleme salonundan konuk daveti ve stüdyo çağrıları.",
     permissions: {
-      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: true,
+      cagri: true, odalar: true, pazarlama: false, dergi: false, ek_hizmetler: false, montaj: true, izleme: false, revize: false, yayin: false, yonetim: false, admin: false, reji: true, iletisim: true, muhasebe: false,
       room_oda1: true, room_oda2: true, room_oda3: true,
       view_montaj_stats: false, view_revision_details: false, view_financial_revenue: false, view_guest_contact: true, can_edit_packages: false, can_delete_records: false,
     },
@@ -491,6 +570,17 @@ const DEFAULT_GUESTS: Guest[] = [
     socialMedia: createDefaultSocialMedia("boransahin", "yazilimas.com", "+90 (532) 840 19 20"),
     room: "oda-1",
     marketer: "Selin Karaca",           // Pazarlamacı satışı kapattı
+    kdvTipi: "dahil",
+    kdvOrani: 20,
+    netTutar: 50000,
+    kdvTutari: 10000,
+    toplamTutarKdvli: 60000,
+    invoiceType: "kurumsal",
+    taxTitle: "Yazılım Teknolojileri A.Ş.",
+    taxOffice: "Maslak Vergi Dairesi",
+    taxNumber: "9480192841",
+    invoiceEmail: "muhasebe@yazilimas.com",
+    invoiceStatus: "kesilmedi",
   },
   {
     id: "guest-ahmet",
@@ -577,6 +667,19 @@ const DEFAULT_GUESTS: Guest[] = [
     socialMedia: createDefaultSocialMedia("canandemir.av", "demirhukuk.com", "+90 (533) 456 12 78"),
     room: "oda-1",
     marketer: "Selin Karaca",           // Pazarlamacı satışı kapattı
+    kdvTipi: "haric",
+    kdvOrani: 20,
+    netTutar: 50000,
+    kdvTutari: 10000,
+    toplamTutarKdvli: 60000,
+    invoiceType: "kurumsal",
+    taxTitle: "Demir Hukuk & Danışmanlık Bürosu",
+    taxOffice: "Beşiktaş Vergi Dairesi",
+    taxNumber: "9182736450",
+    invoiceEmail: "muhasebe@demirhukuk.com",
+    invoiceStatus: "kesildi",
+    invoiceNo: "BCT202600000142",
+    invoiceDate: "12 Ekim 2026",
   },
   {
     id: "guest-murat",
@@ -1369,6 +1472,30 @@ const DEFAULT_STAFF: StaffMember[] = [
     status: "active",
     avatar: "EV",
     createdAt: "2024-03-15",
+  },
+  {
+    id: "usr-meltem",
+    name: "Meltem Yılmaz",
+    email: "meltem@bct.com",
+    username: "meltem",
+    password: "meltem123",
+    role: "Muhasebe & Finans Müdürü",
+    department: "Muhasebe & Finans Departmanı",
+    status: "active",
+    avatar: "MY",
+    createdAt: "2024-03-15",
+  },
+  {
+    id: "usr-canan",
+    name: "Canan Özkan",
+    email: "canan@bct.com",
+    username: "canan",
+    password: "canan123",
+    role: "İletişim & Talep Koordinatörü",
+    department: "İletişim Masası",
+    status: "active",
+    avatar: "CÖ",
+    createdAt: "2024-04-01",
   },
 ];
 
@@ -2677,6 +2804,7 @@ export function resetToDefaults() {
   saveNotifications(DEFAULT_NOTIFICATIONS);
   saveRooms(DEFAULT_ROOMS);
   saveRoles(DEFAULT_ROLES_LIST);
+  saveGuestRequests(DEFAULT_GUEST_REQUESTS);
   notify();
 }
 
@@ -2805,6 +2933,8 @@ export function canRoleAccessPath(roleKey: string, pathname: string): boolean {
   if (pathname.includes("/revize")) return hasRolePermission(roleKey, "revize");
   if (pathname.includes("/yayin")) return hasRolePermission(roleKey, "yayin");
   if (pathname.includes("/reji")) return hasRolePermission(roleKey, "reji") || roleKey === "admin" || roleKey === "reji";
+  if (pathname.includes("/iletisim")) return hasRolePermission(roleKey, "iletisim");
+  if (pathname.includes("/muhasebe")) return hasRolePermission(roleKey, "muhasebe");
   if (pathname.includes("/yonetim")) return hasRolePermission(roleKey, "yonetim");
   if (pathname.includes("/admin")) return hasRolePermission(roleKey, "admin");
   return true;
@@ -3645,6 +3775,331 @@ export function checkUpcomingAppointmentReminders(): number {
   });
 
   return count;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── İLETİŞİM & TALEP MASASI MOTORU (Birimler Arası Talep / Sevk) ──
+// ════════════════════════════════════════════════════════════════════
+
+const GUEST_REQUESTS_STORAGE_KEY = "bct_os_guest_requests";
+
+const DEFAULT_GUEST_REQUESTS: GuestRequest[] = [
+  {
+    id: "req-101",
+    guestId: "guest-boran",
+    guestName: "Boran Şahin",
+    company: "Yazılım A.Ş.",
+    representative: "Ayşe Yılmaz",
+    studio: "Gri Stüdyo",
+    targetDepartment: "reji",
+    priority: "acil",
+    status: "beklemede",
+    title: "Yaka Mikrofonu Parazit Kontrolü & Ekstra İkram",
+    description: "Konuk yayına girmeden önce mikrofonun hafif cızırtı yaptığını bildirdi. Ayrıca stüdyoya girmeden önce su ve çay ikramı istedi.",
+    reportedBy: "Canan Özkan (Danışma)",
+    createdAt: new Date(Date.now() - 35 * 60000).toISOString(),
+  },
+  {
+    id: "req-102",
+    guestId: "guest-canan",
+    guestName: "Canan Yıldız",
+    company: "Finans Danışmanlık A.Ş.",
+    representative: "Seda Yıldız",
+    studio: "Orta Stüdyo",
+    targetDepartment: "muhasebe",
+    priority: "yuksek",
+    status: "islemde",
+    title: "Kurumsal E-Fatura VKN ve Unvan Düzeltmesi",
+    description: "Fatura 'Yıldız Stratejik Finans A.Ş.' adına düzenlenecek. VKN: 9182736450, Beşiktaş Vergi Dairesi. Faturanın bu unvana kesilmesi ve muhasebe@yildizfinans.com adresine iletilmesi rica edildi.",
+    reportedBy: "Canan Özkan (Danışma)",
+    createdAt: new Date(Date.now() - 75 * 60000).toISOString(),
+  },
+  {
+    id: "req-103",
+    guestId: "guest-tolga",
+    guestName: "Tolga Demir",
+    company: "Mega Lojistik A.Ş.",
+    representative: "Emre Çelik",
+    studio: "Gri Stüdyo",
+    targetDepartment: "kurgu",
+    priority: "normal",
+    status: "cozuldu",
+    title: "Alt Bant (KJ) Unvan Yazımı Düzeltmesi",
+    description: "Konuk alt bantta yalnızca 'Yönetim Kurulu Başkanı' değil 'Yönetim Kurulu Başkanı & Kurucu Ortak' yazılmasını rica etti.",
+    reportedBy: "Canan Özkan (Danışma)",
+    resolutionNote: "Kurgu şablonundaki KJ metni konuğun istediği şekilde revize edildi.",
+    createdAt: new Date(Date.now() - 140 * 60000).toISOString(),
+    resolvedAt: new Date(Date.now() - 40 * 60000).toISOString(),
+  },
+  {
+    id: "req-104",
+    targetDepartment: "teknik",
+    priority: "normal",
+    status: "cozuldu",
+    title: "Bekleme Salonu Wi-Fi ve Klima Isısı",
+    description: "Bekleme salonundaki klimanın 23 dereceye getirilmesi ve misafir Wi-Fi kartvizitlerinin masalara konulması istendi.",
+    reportedBy: "Canan Özkan (Danışma)",
+    resolutionNote: "Klima 23C'ye ayarlandı ve Wi-Fi şifre tabelaları yenilendi.",
+    createdAt: new Date(Date.now() - 200 * 60000).toISOString(),
+    resolvedAt: new Date(Date.now() - 110 * 60000).toISOString(),
+  }
+];
+
+function loadGuestRequests(): GuestRequest[] {
+  if (typeof window === "undefined") return DEFAULT_GUEST_REQUESTS;
+  try {
+    const stored = localStorage.getItem(GUEST_REQUESTS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return DEFAULT_GUEST_REQUESTS;
+}
+
+function saveGuestRequests(requests: GuestRequest[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(GUEST_REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+}
+
+export function getGuestRequests(): GuestRequest[] {
+  return loadGuestRequests();
+}
+
+export function addGuestRequest(
+  data: Omit<GuestRequest, "id" | "createdAt" | "status">
+): GuestRequest {
+  const requests = loadGuestRequests();
+  const newReq: GuestRequest = {
+    ...data,
+    id: `req-${Date.now()}`,
+    status: "beklemede",
+    createdAt: new Date().toISOString(),
+  };
+
+  requests.unshift(newReq);
+  saveGuestRequests(requests);
+
+  const deptLabels: Record<string, string> = {
+    reji: "Reji Ekibi",
+    kurgu: "Kurgu & Montaj",
+    pazarlama: "Pazarlama Masası",
+    muhasebe: "Muhasebe & Finans",
+    cagri_merkezi: "Çağrı Merkezi",
+    odalar: "Oda & Temsilciler",
+    dergi: "Dergi Masası",
+    ek_hizmetler: "Ek Hizmetler",
+    izleme: "İzleme Masası",
+    teknik: "Teknik Ekip",
+    yonetim: "Üst Yönetim",
+  };
+
+  const targetLabel = deptLabels[data.targetDepartment] || data.targetDepartment;
+
+  // 1) Hedef birime yüksek öncelikli bildirim fırlat
+  addNotification({
+    to: data.targetDepartment,
+    from: "iletisim",
+    type: data.priority === "acil" ? "warning" : "task",
+    title: `🛎️ Yeni Talep: [${targetLabel}] ${data.title}`,
+    message: `${data.guestName ? `${data.guestName} (${data.company || "Konuk"}): ` : ""}${data.description}`,
+    link: "/dashboard/iletisim",
+  });
+
+  // 2) Eğer konuk varsa ve temsilcisi biliniyorsa temsilciye de bilgi ver
+  if (data.representative) {
+    addNotification({
+      to: data.representative,
+      from: "iletisim",
+      type: "info",
+      title: `ℹ️ Konuğunuz İçin Talep İletildi: ${data.guestName || "Konuk"}`,
+      message: `İletişim masası tarafından ${targetLabel} birimine talep iletildi: ${data.title}`,
+      link: "/dashboard/iletisim",
+    });
+  }
+
+  // 3) Denetim İzi
+  const currentUser = getCurrentUser();
+  addAuditLog({
+    userName: currentUser?.name || data.reportedBy || "İletişim Koordinatörü",
+    userRole: currentUser?.role || "İletişim Masası",
+    action: `Talep Oluşturuldu [${targetLabel}]`,
+    target: data.guestName ? `${data.guestName} (${data.title})` : data.title,
+    category: "system",
+    details: `Öncelik: ${data.priority.toUpperCase()} | Açıklama: ${data.description}`,
+  });
+
+  notify();
+  return newReq;
+}
+
+export function updateGuestRequestStatus(
+  id: string,
+  status: RequestStatus,
+  resolutionNote?: string,
+  resolvedBy?: string
+): boolean {
+  const requests = loadGuestRequests();
+  const req = requests.find((r) => r.id === id);
+  if (!req) return false;
+
+  req.status = status;
+  if (resolutionNote) req.resolutionNote = resolutionNote;
+  if (status === "cozuldu") {
+    req.resolvedAt = new Date().toISOString();
+  }
+  if (resolvedBy) req.assignedTo = resolvedBy;
+
+  saveGuestRequests(requests);
+
+  const currentUser = getCurrentUser();
+  const changerName = currentUser?.name || resolvedBy || "Yetkili";
+
+  // İletişim masasına ve temsilciye durum güncelleme bildirimi gönder
+  if (status === "cozuldu") {
+    addNotification({
+      to: "iletisim",
+      from: req.targetDepartment,
+      type: "success",
+      title: `✅ Talep Çözüldü: ${req.title}`,
+      message: `${req.guestName ? `${req.guestName} - ` : ""}${changerName} tarafından talep çözüldü olarak işaretlendi.${resolutionNote ? ` Not: ${resolutionNote}` : ""}`,
+      link: "/dashboard/iletisim",
+    });
+    if (req.representative) {
+      addNotification({
+        to: req.representative,
+        from: req.targetDepartment,
+        type: "success",
+        title: `✅ Konuk Talebi Çözüldü: ${req.guestName}`,
+        message: `Talebiniz (${req.title}) çözüme kavuşturuldu: ${resolutionNote || "İşlem tamamlandı."}`,
+        link: "/dashboard/iletisim",
+      });
+    }
+  }
+
+  addAuditLog({
+    userName: changerName,
+    userRole: currentUser?.role || "Operasyon",
+    action: `Talep Durumu: ${status.toUpperCase()}`,
+    target: req.title,
+    category: "system",
+    details: resolutionNote || "Durum güncellendi.",
+  });
+
+  notify();
+  return true;
+}
+
+export function deleteGuestRequest(id: string): boolean {
+  let requests = loadGuestRequests();
+  const beforeLen = requests.length;
+  requests = requests.filter((r) => r.id !== id);
+  if (requests.length === beforeLen) return false;
+
+  saveGuestRequests(requests);
+  notify();
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── MUHASEBE & FATURALANDIRMA MOTORU ──
+// ════════════════════════════════════════════════════════════════════
+
+export function updateGuestInvoiceStatus(
+  guestId: string,
+  invoiceStatus: "kesildi" | "kesilmedi" | "muaf",
+  invoiceNo?: string,
+  invoiceDate?: string
+): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  guest.invoiceStatus = invoiceStatus;
+  if (invoiceNo) guest.invoiceNo = invoiceNo;
+  if (invoiceDate) guest.invoiceDate = invoiceDate;
+  else if (invoiceStatus === "kesildi") {
+    guest.invoiceDate = new Date().toLocaleDateString("tr-TR");
+  }
+
+  saveGuests(guests);
+
+  const currentUser = getCurrentUser();
+
+  if (invoiceStatus === "kesildi") {
+    addNotification({
+      to: "pazarlama",
+      from: "muhasebe",
+      type: "success",
+      title: `🧾 Fatura Kesildi: ${guest.name}`,
+      message: `${guest.company} için ${guest.invoiceNo || "Fatura"} düzenlendi (${guest.amount} TL).`,
+      link: "/dashboard/muhasebe",
+    });
+
+    if (guest.representative) {
+      addNotification({
+        to: guest.representative,
+        from: "muhasebe",
+        type: "info",
+        title: `🧾 Fatura Onaylandı: ${guest.name}`,
+        message: `Konuğunuz ${guest.name} için resmi fatura kesildi. Fatura No: ${guest.invoiceNo || "-"}`,
+        link: "/dashboard/muhasebe",
+      });
+    }
+  }
+
+  addAuditLog({
+    userName: currentUser?.name || "Muhasebe Sorumlusu",
+    userRole: currentUser?.role || "Muhasebe",
+    action: `Fatura Durumu: ${invoiceStatus.toUpperCase()}`,
+    target: `${guest.name} (${guest.company})`,
+    category: "system",
+    details: `Fatura No: ${invoiceNo || "-"} | Tarih: ${guest.invoiceDate || "-"}`,
+  });
+
+  notify();
+  return true;
+}
+
+export function updateGuestPayment(
+  guestId: string,
+  paymentStatus: "odenmedi" | "on_odeme" | "tamamlandi" | "ucretsiz",
+  onOdemeMiktari?: number,
+  paymentNote?: string
+): boolean {
+  const guests = loadGuests();
+  const guest = guests.find((g) => g.id === guestId);
+  if (!guest) return false;
+
+  guest.paymentStatus = paymentStatus;
+  if (typeof onOdemeMiktari === "number") {
+    guest.onOdemeMiktari = onOdemeMiktari;
+  }
+
+  saveGuests(guests);
+
+  const currentUser = getCurrentUser();
+
+  addNotification({
+    to: "muhasebe",
+    from: currentUser?.name || "Sistem",
+    type: "info",
+    title: `💳 Tahsilat Güncellendi: ${guest.name}`,
+    message: `${guest.name} (${guest.company}) ödeme durumu: ${paymentStatus.toUpperCase()}${onOdemeMiktari ? ` | Miktar: ${onOdemeMiktari.toLocaleString("tr-TR")} TL` : ""}.${paymentNote ? ` Not: ${paymentNote}` : ""}`,
+    link: "/dashboard/muhasebe",
+  });
+
+  addAuditLog({
+    userName: currentUser?.name || "Kullanıcı",
+    userRole: currentUser?.role || "Finans",
+    action: `Ödeme Durumu Güncellendi: ${paymentStatus.toUpperCase()}`,
+    target: `${guest.name} (${guest.company})`,
+    category: "system",
+    details: `Ön Ödeme: ${onOdemeMiktari || 0} TL | Not: ${paymentNote || "-"}`,
+  });
+
+  notify();
+  return true;
 }
 
 

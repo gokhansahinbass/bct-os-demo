@@ -29,6 +29,12 @@ import {
   getStudioDelays,
   sendStudioDelayAlert,
   clearStudioDelay,
+  getGuestRequests,
+  addGuestRequest,
+  updateGuestRequestStatus,
+  deleteGuestRequest,
+  updateGuestInvoiceStatus,
+  updateGuestPayment,
   updateGuestAppointmentTime,
   confirmGuestAppointment,
   sendGuestArrivalReminder,
@@ -47,6 +53,10 @@ import {
   type GuestStatus,
   type GuestTimeStatus,
   type StudioDelay,
+  type GuestRequest,
+  type RequestTargetDepartment,
+  type RequestPriority,
+  type RequestStatus,
   type StaffMember,
   type Notification,
   type AuditLog,
@@ -70,6 +80,7 @@ export function useStore() {
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [broadcastSchedules, setBroadcastSchedules] = useState<BroadcastSlot[]>([]);
   const [studioDelays, setStudioDelays] = useState<Record<string, StudioDelay>>({});
+  const [guestRequests, setGuestRequests] = useState<GuestRequest[]>([]);
   const [currentUser, setLocalCurrentUser] = useState<StaffMember | null>(null);
   const [adminOriginUser, setLocalAdminOriginUser] = useState<StaffMember | null>(null);
   const [activeRole, setLocalActiveRole] = useState<string>("admin");
@@ -85,6 +96,7 @@ export function useStore() {
     setRoles(getRoles());
     setBroadcastSchedules(getBroadcastSchedules());
     setStudioDelays(getStudioDelays());
+    setGuestRequests(getGuestRequests());
     setLocalCurrentUser(getCurrentUser());
     setLocalAdminOriginUser(getAdminOriginUser());
     setLocalActiveRole(getActiveRole());
@@ -239,6 +251,12 @@ export function useStore() {
     sendStudioDelayAlert,
     clearStudioDelay,
     getStudioDelays,
+    guestRequests,
+    addGuestRequest,
+    updateGuestRequestStatus,
+    deleteGuestRequest,
+    updateGuestInvoiceStatus,
+    updateGuestPayment,
     updateGuestAppointmentTime,
     confirmGuestAppointment,
     sendGuestArrivalReminder,

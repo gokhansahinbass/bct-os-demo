@@ -87,6 +87,15 @@ export default function Header() {
     } else if (newRole === "dergi_tasarimci") {
       const designer = staff.find((s) => s.role.includes("Dergi")) || staff.find((s) => s.department?.includes("Dergi"));
       if (designer) setCurrentUser(designer);
+    } else if (newRole === "reji") {
+      const rejiDirector = staff.find((s) => s.id === "usr-reji" || s.role.includes("Reji"));
+      if (rejiDirector) setCurrentUser(rejiDirector);
+    } else if (newRole === "muhasebe") {
+      const accountant = staff.find((s) => s.id === "usr-meltem" || s.role.includes("Muhasebe"));
+      if (accountant) setCurrentUser(accountant);
+    } else if (newRole === "iletisim") {
+      const coordinator = staff.find((s) => s.id === "usr-canan" || s.role.includes("İletişim"));
+      if (coordinator) setCurrentUser(coordinator);
     }
   }
 
@@ -124,6 +133,10 @@ export default function Header() {
     if (to === "cagri_sefi") return "Çağrı Şefleri";
     if (to === "dergi_tasarimci") return "Dergi Ekibi";
     if (to === "ek_hizmetler") return "Ek Hizmetler";
+    if (to === "muhasebe") return "Muhasebe & Finans";
+    if (to === "iletisim") return "İletişim & Talep Masası";
+    if (to === "teknik") return "Teknik & Donanım";
+    if (to === "yonetim") return "Üst Yönetim";
     return `Kişiye Özel: ${to}`;
   }
 
